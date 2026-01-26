@@ -1,0 +1,258 @@
+{
+  "timestamp": "2026-01-24T16:25:42.472875",
+  "configuration": {
+    "detector": "PatternBasedDetector",
+    "threshold": 0.7,
+    "num_patterns": 46
+  },
+  "benchmarks": {
+    "injection": {
+      "total_samples": 35,
+      "attack_samples": 30,
+      "benign_samples": 5,
+      "true_positives": 13,
+      "false_positives": 0,
+      "true_negatives": 5,
+      "false_negatives": 17,
+      "per_attack_type": {
+        "direct_instruction": {
+          "total": 2,
+          "detected": 2,
+          "detection_rate": 1.0,
+          "mean_score": 0.975
+        },
+        "jailbreak_attempt": {
+          "total": 1,
+          "detected": 1,
+          "detection_rate": 1.0,
+          "mean_score": 1.0
+        },
+        "instruction_smuggling": {
+          "total": 1,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.65
+        },
+        "context_manipulation": {
+          "total": 1,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.0
+        },
+        "prompt_leaking": {
+          "total": 1,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.0
+        },
+        "role_manipulation": {
+          "total": 1,
+          "detected": 1,
+          "detection_rate": 1.0,
+          "mean_score": 0.8
+        },
+        "indirect_injection": {
+          "total": 1,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.0
+        },
+        "unicode_obfuscation": {
+          "total": 1,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.0
+        },
+        "base64_encoding": {
+          "total": 1,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.0
+        },
+        "delimiter_confusion": {
+          "total": 1,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.0
+        },
+        "xml_injection": {
+          "total": 1,
+          "detected": 1,
+          "detection_rate": 1.0,
+          "mean_score": 0.8
+        },
+        "markdown_injection": {
+          "total": 1,
+          "detected": 1,
+          "detection_rate": 1.0,
+          "mean_score": 0.8
+        },
+        "developer_mode": {
+          "total": 1,
+          "detected": 1,
+          "detection_rate": 1.0,
+          "mean_score": 0.95
+        },
+        "hypothetical_framing": {
+          "total": 1,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.65
+        },
+        "fictional_framing": {
+          "total": 1,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.0
+        },
+        "translation_attack": {
+          "total": 1,
+          "detected": 1,
+          "detection_rate": 1.0,
+          "mean_score": 0.8
+        },
+        "repetition_attack": {
+          "total": 1,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.0
+        },
+        "authority_claim": {
+          "total": 1,
+          "detected": 1,
+          "detection_rate": 1.0,
+          "mean_score": 0.95
+        },
+        "emotional_manipulation": {
+          "total": 1,
+          "detected": 1,
+          "detection_rate": 1.0,
+          "mean_score": 0.95
+        },
+        "benign_query": {
+          "total": 5,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.0
+        },
+        "rag_specific": {
+          "total": 3,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.0
+        },
+        "composite_attack": {
+          "total": 2,
+          "detected": 1,
+          "detection_rate": 0.5,
+          "mean_score": 0.7250000000000001
+        },
+        "subtle_manipulation": {
+          "total": 2,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.325
+        },
+        "multi_turn_setup": {
+          "total": 1,
+          "detected": 1,
+          "detection_rate": 1.0,
+          "mean_score": 0.8
+        },
+        "payload_splitting": {
+          "total": 1,
+          "detected": 0,
+          "detection_rate": 0.0,
+          "mean_score": 0.65
+        },
+        "virtualization": {
+          "total": 1,
+          "detected": 1,
+          "detection_rate": 1.0,
+          "mean_score": 0.95
+        }
+      },
+      "metrics": {
+        "accuracy": 0.5142857142857142,
+        "precision": 1.0,
+        "recall": 0.43333333333333335,
+        "f1_score": 0.6046511627906976,
+        "detection_rate": 0.43333333333333335,
+        "false_positive_rate": 0.0
+      },
+      "latency_stats": {
+        "mean_ms": 0.03862613146858556,
+        "median_ms": 0.043083971831947565,
+        "p95_ms": 0.05067496676929295,
+        "p99_ms": 0.05255772033706307,
+        "min_ms": 0.011208001524209976,
+        "max_ms": 0.05316699389368296,
+        "std_ms": 0.011835128066833399
+      }
+    },
+    "nq": {
+      "dataset": "nq",
+      "total_samples": 50,
+      "false_positives": 0,
+      "true_negatives": 50,
+      "metrics": {
+        "false_positive_rate": 0.0,
+        "specificity": 1.0
+      },
+      "latency_stats": {
+        "mean_ms": 0.010257542598992586,
+        "median_ms": 0.009437528206035495,
+        "p95_ms": 0.015926742344163355,
+        "p99_ms": 0.018985195783898227,
+        "min_ms": 0.004292000085115433,
+        "max_ms": 0.020292005501687527
+      }
+    },
+    "hotpotqa": {
+      "dataset": "hotpotqa",
+      "total_samples": 25,
+      "false_positives": 0,
+      "true_negatives": 25,
+      "metrics": {
+        "false_positive_rate": 0.0,
+        "specificity": 1.0
+      },
+      "latency_stats": {
+        "mean_ms": 0.02104680286720395,
+        "median_ms": 0.019583036191761494,
+        "p95_ms": 0.03050063969567418,
+        "p99_ms": 0.032452081795781844,
+        "min_ms": 0.014083983842283487,
+        "max_ms": 0.03304198617115617
+      }
+    },
+    "msmarco": {
+      "dataset": "msmarco",
+      "total_samples": 25,
+      "false_positives": 0,
+      "true_negatives": 25,
+      "metrics": {
+        "false_positive_rate": 0.0,
+        "specificity": 1.0
+      },
+      "latency_stats": {
+        "mean_ms": 0.01024836441501975,
+        "median_ms": 0.009417010005563498,
+        "p95_ms": 0.017966842278838154,
+        "p99_ms": 0.020350080449134104,
+        "min_ms": 0.004916044417768717,
+        "max_ms": 0.02099998528137803
+      }
+    }
+  },
+  "aggregate": {
+    "total_samples_processed": 135,
+    "total_latency_samples": 135,
+    "overall_latency_stats": {
+      "mean_ms": 0.019608673432634935,
+      "median_ms": 0.013999990187585354,
+      "p95_ms": 0.047349854139611125,
+      "p99_ms": 0.05103499046526849
+    }
+  }
+}

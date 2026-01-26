@@ -1,0 +1,1 @@
+"""EmbedGuard test suite."""
