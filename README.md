@@ -1,8 +1,35 @@
 # EmbedGuard: Cross-Layer Detection and Provenance Attestation for Adversarial Embedding Attacks in RAG Systems
 
+[![Paper: IJCESEN](https://img.shields.io/badge/IJCESEN-Q3-blue)](https://doi.org/10.22399/ijcesen.4869)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18364920.svg)](https://doi.org/10.5281/zenodo.18364920)
+[![Zenodo DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18364920.svg)](https://doi.org/10.5281/zenodo.18364920)
+
+## TL;DR
+
+Most RAG defenses sit at one layer — the input prompt, or the retrieved document. EmbedGuard correlates signals **across the embedding, retrieval, and generation layers**, plus hardware-backed cryptographic attestation of the embedding model itself.
+
+| Metric | Value |
+|---|---|
+| Detection rate (optimization attacks) | 94.7% |
+| Detection rate (adaptive attacks) | 89.3% |
+| False positive rate | 3.2% |
+| Latency overhead | 51 ms mean |
+| **Cross-layer improvement (ablation)** | **+18.4 pp** vs best single-layer |
+| Validation scale | 500K embeddings, 47K queries |
+
+The +18.4 pp ablation is the headline: cross-layer correlation is *causally* responsible for the detection improvement — not a side effect of model choice or threshold tuning.
+
+Peer-reviewed: [IJCESEN, 2026 — DOI 10.22399/ijcesen.4869](https://doi.org/10.22399/ijcesen.4869). Parallel PeerJ Computer Science submission in review.
+
+### Quick start
+
+```bash
+git clone https://github.com/neerazz/embedguard
+cd embedguard
+pip install -e .
+python -m embedguard.demo --corpus examples/poisoned_corpus.jsonl
+```
 
 ## Overview
 
