@@ -61,7 +61,15 @@ def _arrow(ax, x0, y0, x1, y1, color=INK, lw=1.1, style="-|>", ls="-"):
 
 
 def figure_1_architecture():
-    """Cross-layer pipeline with signal taps into the correlation engine."""
+    """Delegates to figure1_architecture.py (attack-vs-defense narrative figure)."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import figure1_architecture
+    figure1_architecture.main()
+
+
+def _unused_figure_1_boxes():
+    """Superseded by figure1_architecture.py; kept out of the build."""
     fig, ax = plt.subplots(figsize=(7.0, 4.6))
     ax.set_xlim(0, 10); ax.set_ylim(0, 7.1); ax.axis("off")
 

@@ -135,7 +135,7 @@ EmbedGuard implements a unified framework for reasoning about security signals a
 
 ![Figure 1: EmbedGuard cross-layer detection architecture](images/figure_1.png)
 
-*Figure 1: EmbedGuard cross-layer detection architecture. Four detection layers (Prompt Analysis, TEE Embedding Attestation, Retrieval Distributional Analysis, Output Consistency) generate threat signals that flow to the central Threat Correlation Engine. The engine fuses signals using learned weights and outputs to configurable deployment modes (Passive, Gated, Active).*
+*Figure 1: EmbedGuard cross-layer detection, traced through a worked attack. An attacker plants a fluent poisoned document in the knowledge corpus (red dashed path); a benign user query (blue path) then retrieves the poisoned embedding. Each detection layer emits an anomaly signal for this example — the prompt layer sees a clean query (s₁ = 0.1), embedding attestation finds no valid TEE certificate (s₂ = 1.0), retrieval analysis detects a shifted similarity distribution (s₃ = 0.8), and output verification observes answer instability under perturbation (s₄ = 0.7). No single moderate signal crosses the block threshold; the weighted fusion (ThreatScore = 1.225 ≥ 0.85) does, and the query is blocked with a safe fallback response.*
 
 **Table 3: EmbedGuard Security Requirements**
 
