@@ -105,7 +105,7 @@ Please be respectful and constructive in all interactions. We welcome contributi
 
 - `feature/description` - New features
 - `fix/description` - Bug fixes
-- `docs/description` - Documentation
+- `docs/` - Documentation
 - `perf/description` - Performance improvements
 
 ### Commit Messages

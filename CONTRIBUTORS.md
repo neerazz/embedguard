@@ -45,7 +45,7 @@ If you use EmbedGuard in your research, please cite:
   author = {Beshane, Neeraj Kumar Singh},
   title = {{EmbedGuard: Cross-Layer Detection and Cryptographic Attestation for Secure Retrieval-Augmented Generation}},
   year = {2026},
-  doi = {10.5281/zenodo.18364920},
+  doi = {10.5281/zenodo.18364919},
   url = {https://github.com/neerazz/embedguard}
 }
 ```

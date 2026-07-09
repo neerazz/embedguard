@@ -14,10 +14,7 @@
 The easiest way to run EmbedGuard with all dependencies:
 
 ```bash
-# Pull the pre-built image
-docker pull ghcr.io/neerazz/embedguard:v1.0
-
-# Or build locally
+# Build the image locally from the included Dockerfile
 git clone https://github.com/neerazz/embedguard.git
 cd embedguard
 docker build -t embedguard:latest .

@@ -32,7 +32,7 @@ dpi) and vector PDF.
 ## Publication status
 
 - Peer-reviewed: IJCESEN, 2026 — [DOI 10.22399/ijcesen.4869](https://doi.org/10.22399/ijcesen.4869)
-- Code + data archive: [Zenodo 10.5281/zenodo.18364920](https://doi.org/10.5281/zenodo.18364920)
+- Code + data archive: [Zenodo 10.5281/zenodo.18364919](https://doi.org/10.5281/zenodo.18364919) (concept DOI, resolves to latest version)
 
 Title: EmbedGuard: Cross-Layer Detection and Provenance Attestation for
 Adversarial Embedding Attacks in RAG Systems

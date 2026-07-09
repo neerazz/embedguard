@@ -14,7 +14,7 @@ Independent Researcher, California, USA
 
 ## Abstract
 
-Embedding-based Retrieval-Augmented Generation (RAG) systems are critical infrastructure for production AI applications, yet remain vulnerable to embedding space poisoning attacks that achieve disproportionate success with minimal payloads: PoisonedRAG demonstrates 90% attack success with five malicious texts in corpora of millions, and Phantom shows single-document attacks succeeding black-box against commercial RAG applications. The threat class is now formally catalogued by industry — OWASP LLM08:2025 (Vector and Embedding Weaknesses), MITRE ATLAS AML.T0070 (RAG Poisoning), and NIST AI 100-2e2025 — and has produced production CVEs, including CVE-2025-32711 (EchoLeak) against Microsoft 365 Copilot. Current defenses optimize for isolated attack surfaces, leaving them vulnerable to coordinated attacks that distribute adversarial signals across architectural layers. EmbedGuard is a cross-layer detection framework that fuses anomaly signals from all four RAG architectural layers — prompt injection detection, TEE-based embedding attestation, retrieval distributional analysis, and output consistency verification — into a single correlated detection decision, and binds embedding provenance to a hardware root of trust. We report two evaluation tiers. On a production-scale deployment (500,000 embeddings, 47,000 queries, AMD SEV-SNP hardware), the framework achieves 94.7% detection of optimization-based attacks and 89.3% against adaptive attacks at 3.2% false positive rate and 51ms mean latency overhead, with ablation attributing an 18.4 percentage point improvement to cross-layer correlation over the best single layer. On the openly released EmbedGuard Benchmark v1.0 (Natural Questions, HotpotQA, MS-MARCO, and a 25-category injection attack dataset; N=135), the prompt-layer detector alone achieves 100% detection (30/30) with 0% false positives (0/105) at sub-millisecond latency, reproducible on commodity hardware from the released code. Complete implementation, benchmark d... [truncated]
+Embedding-based Retrieval-Augmented Generation (RAG) systems are critical infrastructure for production AI applications, yet remain vulnerable to embedding space poisoning attacks that achieve disproportionate success with minimal payloads: PoisonedRAG demonstrates 90% attack success with five malicious texts in corpora of millions, and Phantom shows single-document attacks succeeding black-box against commercial RAG applications. The threat class is now formally catalogued by industry — OWASP LLM08:2025 (Vector and Embedding Weaknesses), MITRE ATLAS AML.T0070 (RAG Poisoning), and NIST AI 100-2e2025 — and has produced production CVEs, including CVE-2025-32711 (EchoLeak) against Microsoft 365 Copilot. Current defenses optimize for isolated attack surfaces, leaving them vulnerable to coordinated attacks that distribute adversarial signals across architectural layers. EmbedGuard is a cross-layer detection framework that fuses anomaly signals from all four RAG architectural layers — prompt injection detection, TEE-based embedding attestation, retrieval distributional analysis, and output consistency verification — into a single correlated detection decision, and binds embedding provenance to a hardware root of trust. We report two evaluation tiers. On a production-scale deployment (500,000 embeddings, 47,000 queries, AMD SEV-SNP hardware), the framework achieves 94.7% detection of optimization-based attacks and 89.3% against adaptive attacks at 3.2% false positive rate and 51ms mean latency overhead, with ablation attributing an 18.4 percentage point improvement to cross-layer correlation over the best single layer. On the openly released EmbedGuard Benchmark v1.0 (Natural Questions, HotpotQA, MS-MARCO, and a 25-category injection attack dataset; N=135), the prompt-layer detector alone achieves 100% detection (30/30) with 0% false positives (0/105) at sub-millisecond latency, reproducible on commodity hardware from the released code. Complete implementation, benchmark datasets, and reproducibility scripts are released (Zenodo concept DOI: 10.5281/zenodo.18364919).
 
 **Keywords:** Retrieval-Augmented Generation Security, Embedding Space Poisoning, Cross-Layer Attack Detection, Trusted Execution Environments, Cryptographic Provenance Attestation
 
@@ -54,9 +54,9 @@ To address these limitations, we present EmbedGuard, a cross-layer detection fra
 
 **Hardware-Backed Provenance Attestation:** We present a hardware-backed attestation scheme for embedding generation, binding embedding provenance to a TEE-attested (AMD SEV-SNP) execution environment. This extends software-signature provenance approaches with a hardware root of trust and runtime attestation of the embedding model itself, transforming embedding security from a statistical inference problem into a cryptographic verification problem: attackers must compromise hardware security rather than evade statistical detection.
 
-**Reproducible Benchmark Evaluation:** Comprehensive evaluation on the EmbedGuard Benchmark v1.0—comprising Natural Questions, HotpotQA, MS-MARCO, and a curated 25-category injection attack dataset—demonstrates 100% detection rate (30/30 attacks) with 0% false positive rate (0/105 benign queries) at 0.04ms mean latency. Statistical significance confirmed via Wilcoxon signed-rank test (p < 0.001). Complete code, datasets, and evaluation scripts are released with one-line reproducibility:
+**Reproducible Benchmark Evaluation:** Comprehensive evaluation on the EmbedGuard Benchmark v1.0—comprising Natural Questions, HotpotQA, MS-MARCO, and a curated 25-category injection attack dataset—demonstrates 100% detection rate (30/30 attacks) with 0% false positive rate (0/105 benign queries) at 0.04ms mean latency. Statistical significance confirmed via Wilcoxon signed-rank test (p < 0.001). Complete code, datasets, and evaluation scripts are released with one-command reproducibility:
 ```bash
-docker run --rm ghcr.io/neerazz/embedguard:v1.0 python -m src.evaluation.run_benchmarks
+git clone https://github.com/neerazz/embedguard && cd embedguard && ./reproduce.sh
 ```
 
 **Attack Coverage Analysis:** Systematic evaluation across 25 distinct attack categories including direct injection, jailbreak attempts, encoding obfuscation (Unicode, Base64), delimiter confusion, XML/Markdown injection, hypothetical/fictional framing, translation attacks, authority claims, emotional manipulation, RAG-specific attacks, composite multi-vector attacks, and subtle manipulation demonstrates robust detection across all categories with per-category detection scores ranging from 0.80 to 1.0.
@@ -172,7 +172,7 @@ Detection signals from the prompt layer receive intermediate confidence weightin
 | Composite Patterns | 13 | Multi-vector combinations | 0.90 |
 | **Total** | **81** | — | — |
 
-The full pattern taxonomy and regex definitions are available in `src/prompt_detector/patterns.py`.
+The full pattern taxonomy and regex definitions are available in `embedguard/prompt_detector/__init__.py` (`INJECTION_PATTERNS`).
 
 ### 3.3 Layer 2: Cryptographic Embedding Attestation
 
@@ -700,7 +700,7 @@ Complete implementation and evaluation materials are available with FAIR-complia
 
 **Primary Repository:** https://github.com/neerazz/embedguard (MIT License)
 
-**Archived Version:** Zenodo DOI: [10.5281/zenodo.18364920](https://doi.org/10.5281/zenodo.18364920)
+**Archived Versions:** Zenodo concept DOI [10.5281/zenodo.18364919](https://doi.org/10.5281/zenodo.18364919) (resolves to latest); v1.0.0 = [10.5281/zenodo.18364920](https://doi.org/10.5281/zenodo.18364920) (version evaluated in this article), v1.1.0 = [10.5281/zenodo.21280092](https://doi.org/10.5281/zenodo.21280092) (post-publication maintenance)
 
 **Contents:**
 - **Source Code:** Complete EmbedGuard framework implementation (Python 3.10+)
@@ -708,17 +708,16 @@ Complete implementation and evaluation materials are available with FAIR-complia
 - **Attack Dataset:** 35 injection samples spanning 25 attack categories with ground-truth labels
 - **Adversarial Tests:** 120 prompts from JailbreakBench (GCG, PAIR, AutoDAN, TAP)
 - **Evaluation Scripts:** Reproducible benchmark runner with statistical tests
-- **Detection Patterns:** 81 patterns in `src/prompt_detector/patterns.py`
+- **Detection Patterns:** 81 patterns in `embedguard/prompt_detector/__init__.py` (`INJECTION_PATTERNS`)
 - **Docker Image:** Pre-built container for one-line reproducibility
 
 **Reproducibility Commands:**
 ```bash
-# Option 1: Docker (recommended)
-docker run --rm ghcr.io/neerazz/embedguard:v1.0 python -m src.evaluation.run_benchmarks
+# Option 1: One command (venv + tests + benchmark report)
+git clone https://github.com/neerazz/embedguard.git && cd embedguard && ./reproduce.sh
 
-# Option 2: Local installation
-git clone https://github.com/neerazz/embedguard.git && cd embedguard
-pip install -e . && python -m src.evaluation.run_benchmarks
+# Option 2: Docker (build locally from the included Dockerfile)
+docker build -t embedguard . && docker run --rm embedguard python examples/run_benchmarks.py
 ```
 
 **Random Seed:** All experiments use seed=42 for deterministic reproduction. See Appendix A for complete software specifications.
@@ -847,7 +846,7 @@ Zou W, Geng J, Xi Z, Tang Y, Yu M, Wu B. 2024. PoisonedRAG: Knowledge Corruption
 ### A.4 Reproducibility Checklist
 
 - [x] Code available at: https://github.com/neerazz/embedguard
-- [x] Archived version with DOI: Zenodo 10.5281/zenodo.18364920
+- [x] Archived versions with DOIs: Zenodo concept 10.5281/zenodo.18364919 (v1.0.0: 18364920, v1.1.0: 21280092)
 - [x] Random seed documented: 42 (all experiments)
 - [x] Benchmark datasets included (`data/` directory)
 - [x] Configuration files for all experiments provided

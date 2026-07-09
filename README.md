@@ -20,6 +20,8 @@ Most RAG defenses sit at one layer — the input prompt, or the retrieved docume
 
 The +18.4 pp ablation is the headline: cross-layer correlation is *causally* responsible for the detection improvement — not a side effect of model choice or threshold tuning.
 
+The table above is the production-scale evaluation (requires TEE hardware + production corpus; documented in the published article). The repo also ships an **open benchmark you can run yourself** — `./reproduce.sh` exercises the prompt-layer detector on 135 samples (Natural Questions, HotpotQA, MS-MARCO + a 25-category injection set): 100% detection (30/30), 0% false positives (0/105), sub-millisecond latency. The two tiers and how they relate are laid out in [`paper/manuscript.md`](paper/manuscript.md) §4.
+
 Peer-reviewed: [IJCESEN, 2026 — DOI 10.22399/ijcesen.4869](https://doi.org/10.22399/ijcesen.4869).
 
 ### Quick start
@@ -89,7 +91,22 @@ EmbedGuard is an adaptive, cross-layer detection framework integrating hardware-
 
 ## Architecture
 
-EmbedGuard implements a multi-stage detection pipeline:
+![EmbedGuard cross-layer detection architecture](paper/images/figure_1.png)
+
+*A poisoned document planted in the corpus (red dashed path) is retrieved for a benign
+query (blue path). Each layer emits an anomaly signal; no single moderate signal crosses
+the block threshold, but the weighted fusion (ThreatScore = 1.225 ≥ 0.85) does — the
+query is blocked with a safe fallback. Figure source: [`paper/scripts/figure1_architecture.py`](paper/scripts/figure1_architecture.py);
+all figures regenerate via [`paper/scripts/generate_figures.py`](paper/scripts/generate_figures.py).*
+
+### Detection flow
+
+```
+user query ──► L1 prompt analysis ──────────────┐
+corpus doc ──► L2 embedding attestation (TEE) ──┤    ThreatScore = Σ βᵢ·sᵢ
+retrieval  ──► L3 distributional analysis ──────┼──► flag ≥ 0.70 · block ≥ 0.85
+LLM output ──► L4 consistency verification ─────┘    (passive / gated / active)
+```
 
 ### Layer 1: Prompt Injection Detection
 - DistilBERT-based neural classifier
@@ -100,6 +117,12 @@ EmbedGuard implements a multi-stage detection pipeline:
 - TEE-based embedding generation with hardware isolation
 - Cryptographic signing of embedding provenance
 - 1.8ms signature generation, 0.3ms validation overhead
+
+![TEE-based embedding attestation protocol](paper/images/figure_2.png)
+
+*Ingestion: embeddings are generated inside the enclave, which signs H(document),
+H(model), the vector, timestamp, and platform measurements. Retrieval: certificates
+are verified before results are accepted; unverified embeddings are rejected.*
 
 ### Layer 3: Retrieval Distributional Analysis
 - Incremental PCA for similarity distribution monitoring
@@ -139,8 +162,14 @@ embedguard/
 │   ├── test_core.py              # Core functionality tests
 │   ├── test_prompt_detector.py   # Prompt detection tests
 │   └── test_correlation_engine.py # Correlation tests
-└── scripts/
-    └── generate_test_data.py     # Synthetic data generation
+├── data/                          # Benchmark + attack datasets
+├── docs/                          # INSTALL.md, USAGE.md
+├── results/                       # Canonical benchmark report + JSON
+├── paper/                         # Manuscript, figures, figure scripts,
+│                                  #   novelty scan, threat-evidence brief
+├── scripts/
+│   └── generate_test_data.py     # Synthetic data generation
+└── reproduce.sh                   # One command: venv + tests + benchmarks
 ```
 
 ## Installation
@@ -359,6 +388,8 @@ referenced by the paper. Note that the large-scale evaluation in the paper
 | TrustRAG | 79.3% | 54.2% | 35ms |
 
 ### Ablation Study
+
+![Cross-layer ablation](paper/images/figure_4.png)
 
 | Configuration | Detection Rate | Δ from Full System |
 |---------------|----------------|--------------------|
