@@ -21,7 +21,7 @@ from embedguard.types import (
     ThreatLevel,
 )
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "Neeraj Kumar Singh Beshane"
 __email__ = "b.neerajkumarsingh@gmail.com"
 

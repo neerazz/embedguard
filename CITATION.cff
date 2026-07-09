@@ -17,8 +17,8 @@ identifiers:
 repository-code: "https://github.com/neerazz/embedguard"
 url: "https://github.com/neerazz/embedguard"
 license: MIT
-version: "1.0.0"
-date-released: "2026-01-24"
+version: "1.1.0"
+date-released: "2026-07-09"
 keywords:
   - "retrieval-augmented generation"
   - "RAG security"

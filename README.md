@@ -389,7 +389,7 @@ If you use EmbedGuard in your research, please cite:
   year = {2026},
   doi = {10.5281/zenodo.18364920},
   url = {https://github.com/neerazz/embedguard},
-  version = {1.0.0},
+  version = {1.1.0},
   license = {MIT}
 }
 ```
@@ -437,4 +437,4 @@ This research was conducted independently. The author thanks the security resear
 ---
 
 **Status**: Published in IJCESEN (DOI 10.22399/ijcesen.4869)
-**Version**: 1.0.0
+**Version**: 1.1.0

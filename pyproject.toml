@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "embedguard"
-version = "1.0.0"
+version = "1.1.0"
 description = "Cross-Layer Detection and Provenance Attestation for Adversarial Embedding Attacks in RAG Systems"
 readme = "README.md"
 license = {text = "MIT"}
