@@ -6,8 +6,12 @@ Source materials for the EmbedGuard paper.
 
 ```
 paper/
-├── manuscript.md      # Manuscript source (Markdown)
-├── images/            # Figures 1-8 referenced by the manuscript
+├── manuscript.md      # Full manuscript (Markdown) — v3.0, integrates both
+│                      #   evaluation tiers and the 2025-2026 related work
+├── images/            # Figures referenced by the manuscript
+├── research/          # Supporting research artifacts
+│   ├── novelty-scan-2026-07-09.md          # 32-paper annotated novelty scan
+│   └── rag-security-evidence-2024-2026.md  # Verified CVE/OWASP/ATLAS/NIST evidence
 └── scripts/
     ├── generate_figures.py        # Regenerates the figures
     └── generate_tier1_figures.py  # Higher-resolution variants

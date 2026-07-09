@@ -3,7 +3,7 @@
 [![Paper: IJCESEN](https://img.shields.io/badge/IJCESEN-Q3-blue)](https://doi.org/10.22399/ijcesen.4869)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Zenodo DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18364920.svg)](https://doi.org/10.5281/zenodo.18364920)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18364920.svg)](https://doi.org/10.5281/zenodo.18364920)
 
 ## TL;DR
 
@@ -79,9 +79,9 @@ EmbedGuard is an adaptive, cross-layer detection framework integrating hardware-
 
 ## Key Contributions
 
-1. **Cross-Layer Detection**: First framework to correlate anomaly signals across all RAG layers, providing 18.4 percentage point improvement over best single-layer approach
+1. **Cross-Layer Signal Fusion**: To our knowledge, the first defense that fuses anomaly signals from all four RAG layers into a single correlated detection decision (prior layered defenses run layers as independent filters), providing 18.4 percentage point improvement over the best single-layer approach
 
-2. **Cryptographic Attestation**: Hardware-backed embedding generation that transforms security from statistical inference to cryptographic verification
+2. **Hardware-Backed Attestation**: Embedding provenance bound to a TEE-attested execution environment (AMD SEV-SNP) — a hardware root of trust extending software-signature provenance approaches
 
 3. **Production Evaluation**: Comprehensive evaluation on production-scale system (500,000 embeddings, 47,000 queries) with 27.9-35.1 percentage point improvements over existing defenses under adaptive attacks
 
