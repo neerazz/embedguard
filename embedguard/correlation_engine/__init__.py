@@ -122,54 +122,34 @@ class ThreatCorrelationEngine:
     def _compute_threat_score(
         self, layer_signals: Dict[str, LayerSignal]
     ) -> float:
-        """Compute threat score using Bayesian update across layers.
+        """Compute the fused threat score across layers.
 
-        Instead of simple weighted average, each layer updates a prior
-        probability of attack. This captures the intuition that evidence
-        from multiple independent layers compounds.
-        
-        Bayesian Update:
-            P(attack | evidence) = P(evidence | attack) * P(attack) / P(evidence)
-            
-        We use log-odds for numerical stability:
-            log_odds_posterior = log_odds_prior + log_likelihood_ratio
+        Two components, combined fail-closed:
+
+        1. Weighted consensus: confidence-weighted average of layer scores,
+           using the per-layer weights from the paper. This captures
+           agreement across layers.
+        2. Strongest-signal floor: the highest confidence-weighted single
+           layer score. A confident detection on one layer must not be
+           diluted by quiet layers (fail-closed security posture).
+
+        The final score is the maximum of the two.
         """
-        # Base prior: assume 10% of queries are attacks (from production data)
-        prior_attack = 0.10
-        log_odds = np.log(prior_attack / (1 - prior_attack))
-        
-        # Layer processing order: prompt -> embedding -> retrieval -> output
-        layer_order = ["prompt", "embedding", "retrieval", "output"]
-        
-        for layer_name in layer_order:
-            if layer_name not in layer_signals:
-                continue
-                
-            signal = layer_signals[layer_name]
+        weighted_sum = 0.0
+        weight_total = 0.0
+        strongest = 0.0
+
+        for layer_name, signal in layer_signals.items():
             weight = self.layer_weights.get(layer_name, 0.25)
-            
-            # Compute likelihood ratio for this layer
-            # P(score | attack) / P(score | benign)
-            # We model this as: high score = high likelihood of attack
-            # Using logistic transformation to map score to likelihood ratio
-            score = signal.score
-            confidence = signal.confidence
-            
-            # Likelihood ratio: how much this evidence shifts our belief
-            # Score of 0.5 = neutral (LR=1), higher = more attack-like
-            # Scaled by layer weight and confidence
-            if score > 0:
-                # Log-likelihood ratio, bounded for stability
-                log_lr = weight * confidence * np.log(
-                    max(score, 0.01) / max(1 - score, 0.01)
-                )
-                log_lr = np.clip(log_lr, -5, 5)  # Prevent extreme updates
-                log_odds += log_lr
-        
-        # Convert log-odds back to probability
-        posterior = 1 / (1 + np.exp(-log_odds))
-        
-        return float(np.clip(posterior, 0.0, 1.0))
+            effective_weight = weight * signal.confidence
+            weighted_sum += signal.score * effective_weight
+            weight_total += effective_weight
+            strongest = max(strongest, signal.score * signal.confidence)
+
+        consensus = weighted_sum / weight_total if weight_total > 0 else 0.0
+        score = max(consensus, strongest)
+
+        return float(np.clip(score, 0.0, 1.0))
 
     def _compute_correlation_factor(
         self, layer_signals: Dict[str, LayerSignal]

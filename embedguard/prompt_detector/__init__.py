@@ -212,6 +212,20 @@ class PromptInjectionDetector:
         self._compiled_patterns = [
             re.compile(p, re.IGNORECASE) for p in INJECTION_PATTERNS
         ]
+        # Variants for matching against normalized (whitespace-stripped)
+        # text: required-whitespace tokens become optional so patterns like
+        # "ignore\s+instructions" still hit "ignoreinstructions". Patterns
+        # with backreferences or repeated groups are kept as-is: making their
+        # whitespace optional causes catastrophic backtracking on
+        # whitespace-free input.
+        def _normalized_variant(p: str) -> re.Pattern:
+            if "\\1" in p or "){2,}" in p or "){3,}" in p:
+                return re.compile(p, re.IGNORECASE)
+            return re.compile(p.replace(r"\s+", r"\s*"), re.IGNORECASE)
+
+        self._compiled_patterns_normalized = [
+            _normalized_variant(p) for p in INJECTION_PATTERNS
+        ]
 
         # Load neural model if enabled
         self.model = None
@@ -324,9 +338,11 @@ class PromptInjectionDetector:
         matched = []
         normalized = normalize_input(query)
         
-        for i, pattern in enumerate(self._compiled_patterns):
+        for i, (pattern, norm_pattern) in enumerate(
+            zip(self._compiled_patterns, self._compiled_patterns_normalized)
+        ):
             # Check both original and normalized text
-            if pattern.search(query) or pattern.search(normalized):
+            if pattern.search(query) or norm_pattern.search(normalized):
                 matched.append(f"pattern_{i}")
 
         if not matched:

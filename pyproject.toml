@@ -9,10 +9,10 @@ description = "Cross-Layer Detection and Provenance Attestation for Adversarial 
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Neeraj Kumar Singh Beshane", email = "neeraj@example.com"}
+    {name = "Neeraj Kumar Singh Beshane", email = "b.neerajkumarsingh@gmail.com"}
 ]
 maintainers = [
-    {name = "Neeraj Kumar Singh Beshane", email = "neeraj@example.com"}
+    {name = "Neeraj Kumar Singh Beshane", email = "b.neerajkumarsingh@gmail.com"}
 ]
 keywords = [
     "rag",

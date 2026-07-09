@@ -1,80 +1,30 @@
-# EmbedGuard Paper - PeerJ Computer Science Submission
+# Paper
 
-## Directory Structure
+Source materials for the EmbedGuard paper.
+
+## Contents
 
 ```
 paper/
-├── README.md                    # This file
-├── manuscript.md                # Source manuscript (Markdown)
-├── EmbedGuard_PeerJ_Submission.docx  # Submission-ready DOCX (with figures)
-├── SUBMISSION_GUIDE.md          # PeerJ submission guidelines
-├── PEERJ_ACCEPTANCE_PLAN.md     # PeerJ acceptance readiness plan
-├── TIER1_VENUE_PLAN.md          # Future upgrade plan for Tier-1 venues
-├── figures/                     # Publication figures
-│   ├── figure1_architecture.png
-│   ├── figure1_architecture.pdf
-│   ├── figure2_tee_protocol.png
-│   ├── figure2_tee_protocol.pdf
-│   ├── figure3_comparative_detection.png
-│   ├── figure3_comparative_detection.pdf
-│   ├── figure4_ablation_study.png
-│   ├── figure4_ablation_study.pdf
-│   ├── figure5_latency_breakdown.png
-│   └── figure5_latency_breakdown.pdf
+├── manuscript.md      # Manuscript source (Markdown)
+├── images/            # Figures 1-8 referenced by the manuscript
 └── scripts/
-    ├── create_docx.py           # Generate DOCX from manuscript
-    ├── generate_figures.py      # Generate paper figures
-    └── generate_tier1_figures.py # Generate Tier-1 venue figures
+    ├── generate_figures.py        # Regenerates the figures
+    └── generate_tier1_figures.py  # Higher-resolution variants
 ```
 
-## Quick Start
-
-### Regenerate DOCX
+## Regenerating figures
 
 ```bash
-cd paper/scripts
-python3 -m venv .venv
-source .venv/bin/activate
-pip install python-docx
-python3 create_docx.py
-```
-
-### Regenerate Figures
-
-```bash
-cd paper/scripts
-python3 -m venv .venv
-source .venv/bin/activate
 pip install matplotlib numpy
-python3 generate_figures.py
+python3 scripts/generate_figures.py
 ```
 
-## Submission Status
+## Publication status
 
-| Item | Status |
-|------|--------|
-| Manuscript | ✅ Complete |
-| Figures | ✅ Complete (5 figures) |
-| DOCX with embedded figures | ✅ Complete (840 KB) |
-| Ethics statement | ✅ Added |
-| Statistical significance | ✅ Added |
-| GitHub repository | ✅ https://github.com/neerazz/embedguard |
-| Zenodo DOI | 🔲 Pending |
+- Peer-reviewed: IJCESEN, 2026 — [DOI 10.22399/ijcesen.4869](https://doi.org/10.22399/ijcesen.4869)
+- Code + data archive: [Zenodo 10.5281/zenodo.18364920](https://doi.org/10.5281/zenodo.18364920)
 
-## Before Submission
-
-1. Create Zenodo archive from GitHub release
-2. Update DOI in manuscript.md (replace `XXXXXXX`)
-3. Regenerate DOCX
-4. Submit to PeerJ Computer Science
-
-## Target Venues
-
-- **Primary:** PeerJ Computer Science (current submission)
-- **Future:** USENIX Security 2026 (see TIER1_VENUE_PLAN.md)
-
-## Paper Details
-
-- **Title:** EmbedGuard: Cross-Layer Detection and Provenance Attestation for Adversarial Embedding Attacks in RAG Systems
-- **Author:** Neeraj Kumar Singh Beshane
-- **Keywords:** RAG Security, Embedding Poisoning, TEE Attestation, Cross-Layer Detection
+Title: EmbedGuard: Cross-Layer Detection and Provenance Attestation for
+Adversarial Embedding Attacks in RAG Systems
+Author: Neeraj Kumar Singh Beshane ([ORCID 0009-0002-2125-1805](https://orcid.org/0009-0002-2125-1805))

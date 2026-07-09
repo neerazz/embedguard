@@ -23,7 +23,7 @@ from embedguard.types import (
 
 __version__ = "1.0.0"
 __author__ = "Neeraj Kumar Singh Beshane"
-__email__ = "neeraj@example.com"
+__email__ = "b.neerajkumarsingh@gmail.com"
 
 __all__ = [
     "EmbedGuard",

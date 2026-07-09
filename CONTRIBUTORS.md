@@ -26,7 +26,7 @@
 
 ## Acknowledgments
 
-The author acknowledges the anonymous reviewers for their constructive feedback on the manuscript submitted to PeerJ Computer Science.
+The author acknowledges the anonymous reviewers for their constructive feedback on the manuscript.
 
 ## How to Contribute
 

@@ -40,7 +40,6 @@ references:
         given-names: "Neeraj Kumar Singh"
         orcid: "https://orcid.org/0009-0002-2125-1805"
     title: "EmbedGuard: Cross-Layer Detection and Cryptographic Attestation for Secure Retrieval-Augmented Generation"
-    journal: "PeerJ Computer Science"
+    journal: "International Journal of Computational and Experimental Science and Engineering (IJCESEN)"
     year: 2026
-    status: "submitted"
-    doi: "10.5281/zenodo.18364920"
+    doi: "10.22399/ijcesen.4869"
