@@ -781,6 +781,6 @@ Zou W, Geng J, Xi Z, Tang Y, Yu M, Wu B. 2024. PoisonedRAG: Knowledge Corruption
 
 ---
 
-*Manuscript prepared for PeerJ Computer Science submission*
+*Published in IJCESEN, 2026 — DOI 10.22399/ijcesen.4869*
 *Version: 2.1 (Reconciled with actual benchmark results)*
 *Date: January 2026*
