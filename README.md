@@ -336,6 +336,19 @@ config = EmbedGuardConfig(
 
 ## Evaluation Results
 
+### Reproducing the results
+
+```bash
+./reproduce.sh
+```
+
+This sets up a virtualenv, runs the unit test suite, and regenerates the
+benchmark report under `results/`. The committed
+`results/benchmark_report_20260125_005427.md` is the canonical run
+referenced by the paper. Note that the large-scale evaluation in the paper
+(500K embeddings, 47K queries) requires TEE hardware and a production corpus;
+`reproduce.sh` covers the detector benchmarks that run on commodity hardware.
+
 ### Comparative Performance
 
 | Defense System | Baseline Detection | Adaptive Detection | Latency |
