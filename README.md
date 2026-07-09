@@ -3,7 +3,7 @@
 [![Paper: IJCESEN](https://img.shields.io/badge/IJCESEN-Q3-blue)](https://doi.org/10.22399/ijcesen.4869)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18364920.svg)](https://doi.org/10.5281/zenodo.18364920)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18364919.svg)](https://doi.org/10.5281/zenodo.18364919)
 
 ## TL;DR
 
@@ -44,7 +44,7 @@ EmbedGuard addresses adversarial embedding attacks in Retrieval-Augmented Genera
 **ORCID**: [0009-0002-2125-1805](https://orcid.org/0009-0002-2125-1805)
 **Affiliation**: Independent Researcher, California, USA
 **Contact**: b.neerajkumarsingh@gmail.com
-**Zenodo DOI**: [10.5281/zenodo.18364920](https://doi.org/10.5281/zenodo.18364920)
+**Zenodo DOI**: [10.5281/zenodo.18364919](https://doi.org/10.5281/zenodo.18364919) (concept, resolves to latest; v1.1.0: [10.5281/zenodo.21280092](https://doi.org/10.5281/zenodo.21280092))
 
 > **Note**: This work was conducted independently and is not affiliated with the author's employer.
 
@@ -387,7 +387,7 @@ If you use EmbedGuard in your research, please cite:
   author = {Beshane, Neeraj Kumar Singh},
   title = {{EmbedGuard: Cross-Layer Detection and Cryptographic Attestation for Secure Retrieval-Augmented Generation}},
   year = {2026},
-  doi = {10.5281/zenodo.18364920},
+  doi = {10.5281/zenodo.18364919},
   url = {https://github.com/neerazz/embedguard},
   version = {1.1.0},
   license = {MIT}

@@ -12,8 +12,14 @@ authors:
     affiliation: "Independent Researcher"
 identifiers:
   - type: doi
+    value: "10.5281/zenodo.18364919"
+    description: "Zenodo concept DOI (resolves to the latest version)"
+  - type: doi
+    value: "10.5281/zenodo.21280092"
+    description: "Zenodo archive of EmbedGuard v1.1.0"
+  - type: doi
     value: "10.5281/zenodo.18364920"
-    description: "Zenodo archive of EmbedGuard source code and datasets"
+    description: "Zenodo archive of EmbedGuard v1.0.0 (version of record)"
 repository-code: "https://github.com/neerazz/embedguard"
 url: "https://github.com/neerazz/embedguard"
 license: MIT
