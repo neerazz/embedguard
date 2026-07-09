@@ -509,7 +509,7 @@ The wide confidence interval on detection rate (88.4% lower bound) reflects the 
 
 Latency overhead is sub-millisecond across all datasets, with aggregate mean of 0.047ms and P99 of 0.156ms. This enables real-time detection without perceptible user-facing latency impact. Attack queries show higher latency (0.098ms mean) due to pattern matching overhead when attacks trigger multiple detection patterns simultaneously.
 
-![Figure 3: Latency distribution across benchmark datasets](images/figure_7.png)
+![Figure 3: Latency distribution across benchmark datasets](images/figure_3.png)
 
 *Figure 3: Latency distribution across benchmark datasets showing sub-millisecond detection performance.*
 
@@ -557,7 +557,7 @@ The prompt classifier achieves 100% detection on the Tier 2 benchmark, while the
 
 The Threat Correlation Engine fuses signals using: ThreatScore = Σᵢ βᵢ × signalᵢ with flag threshold 0.70 and block threshold 0.85. The prompt layer's 100% standalone performance on the Tier 2 benchmark demonstrates effective first-line defense; the Tier 1 results demonstrate that the remaining layers carry the detection load for attacks that never appear in the query.
 
-![Figure 4: Ablation — cross-layer contribution](images/figure_8.png)
+![Figure 4: Ablation — cross-layer contribution](images/figure_4.png)
 
 *Figure 4: Ablation analysis of cross-layer contribution: detection rate by layer configuration.*
 
