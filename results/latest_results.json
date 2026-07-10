@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-01-24T20:45:50.832232",
+  "timestamp": "2026-07-10T02:56:40.750932",
   "configuration": {
-    "detector": "PatternBasedDetector",
+    "detector": "PromptInjectionDetector (pattern-only)",
     "threshold": 0.7,
-    "num_patterns": 81
+    "num_patterns": 83
   },
   "benchmarks": {
     "injection": {
@@ -61,7 +61,7 @@
           "total": 1,
           "detected": 1,
           "detection_rate": 1.0,
-          "mean_score": 0.8
+          "mean_score": 0.85
         },
         "base64_encoding": {
           "total": 1,
@@ -85,7 +85,7 @@
           "total": 1,
           "detected": 1,
           "detection_rate": 1.0,
-          "mean_score": 0.85
+          "mean_score": 0.8
         },
         "developer_mode": {
           "total": 1,
@@ -115,7 +115,7 @@
           "total": 1,
           "detected": 1,
           "detection_rate": 1.0,
-          "mean_score": 0.8
+          "mean_score": 0.85
         },
         "authority_claim": {
           "total": 1,
@@ -163,7 +163,7 @@
           "total": 1,
           "detected": 1,
           "detection_rate": 1.0,
-          "mean_score": 0.9
+          "mean_score": 0.85
         },
         "virtualization": {
           "total": 1,
@@ -181,13 +181,13 @@
         "false_positive_rate": 0.0
       },
       "latency_stats": {
-        "mean_ms": 0.08751308611993279,
-        "median_ms": 0.08762499783188105,
-        "p95_ms": 0.1324578945059329,
-        "p99_ms": 0.14462670427747065,
-        "min_ms": 0.021458021365106106,
-        "max_ms": 0.14879205264151096,
-        "std_ms": 0.033250976875647875
+        "mean_ms": 0.16924879413896374,
+        "median_ms": 0.17862499225884676,
+        "p95_ms": 0.24894548696465782,
+        "p99_ms": 0.27315568644553423,
+        "min_ms": 0.04495895700529218,
+        "max_ms": 0.2751249703578651,
+        "std_ms": 0.061085409855454166
       }
     },
     "nq": {
@@ -200,12 +200,12 @@
         "specificity": 1.0
       },
       "latency_stats": {
-        "mean_ms": 0.021674998570233583,
-        "median_ms": 0.019791972590610385,
-        "p95_ms": 0.03960447793360798,
-        "p99_ms": 0.050109162111766616,
-        "min_ms": 0.006958958692848682,
-        "max_ms": 0.05545798921957612
+        "mean_ms": 0.04152503679506481,
+        "median_ms": 0.03810401540249586,
+        "p95_ms": 0.07175622740760444,
+        "p99_ms": 0.08683732245117423,
+        "min_ms": 0.016708974726498127,
+        "max_ms": 0.09520800085738301
       }
     },
     "hotpotqa": {
@@ -218,12 +218,12 @@
         "specificity": 1.0
       },
       "latency_stats": {
-        "mean_ms": 0.05329175852239132,
-        "median_ms": 0.04795799031853676,
-        "p95_ms": 0.09624157100915907,
-        "p99_ms": 0.11314115254208441,
-        "min_ms": 0.0284170382656157,
-        "max_ms": 0.11804100358858705
+        "mean_ms": 0.09872512426227331,
+        "median_ms": 0.09179097833111882,
+        "p95_ms": 0.18073362298309795,
+        "p99_ms": 0.18679702188819647,
+        "min_ms": 0.05520798731595278,
+        "max_ms": 0.18691702280193567
       }
     },
     "msmarco": {
@@ -236,12 +236,12 @@
         "specificity": 1.0
       },
       "latency_stats": {
-        "mean_ms": 0.0195850757881999,
-        "median_ms": 0.01679197885096073,
-        "p95_ms": 0.03942538751289246,
-        "p99_ms": 0.045880086254328475,
-        "min_ms": 0.008167000487446785,
-        "max_ms": 0.047250010538846254
+        "mean_ms": 0.037646484561264515,
+        "median_ms": 0.03312499029561877,
+        "p95_ms": 0.07309180218726391,
+        "p99_ms": 0.08340814849361776,
+        "min_ms": 0.01645804150030017,
+        "max_ms": 0.08545798482373357
       }
     }
   },
@@ -249,10 +249,47 @@
     "total_samples_processed": 135,
     "total_latency_samples": 135,
     "overall_latency_stats": {
-      "mean_ms": 0.04421206518869709,
-      "median_ms": 0.0284170382656157,
-      "p95_ms": 0.11870371527038515,
-      "p99_ms": 0.1345577917527407
+      "mean_ms": 0.08451296189041049,
+      "median_ms": 0.05520798731595278,
+      "p95_ms": 0.2185456862207502,
+      "p99_ms": 0.2594304725062101
+    }
+  },
+  "provenance": {
+    "source_commit": "2bc75a134a4612fd9c9ab9c7894c8cd6c3cf6c0b",
+    "source_binding": "source_file_sha256 binds the exact benchmark implementation",
+    "source_file_sha256": {
+      "embedguard/prompt_detector/__init__.py": "f9a7e4da595de19ea4e3fb399e7591a789e5541fcf31b2fdb20830fa047c696c",
+      "examples/run_benchmarks.py": "1a240b822a73271088abbf6cb9975638be361609547bc393f2e5abd4926f8068",
+      "scripts/statistical_tests.py": "eef0579f2dbea90291f746380fdccc111ba359a0dd8540fcc11415c07afbff60",
+      "pyproject.toml": "7b436d66c7c47717931b94a82ee96a31a96d268e69886542798de34eabc3dca8"
+    },
+    "input_file_sha256": {
+      "data/attacks/injection/prompt_injection.jsonl": "d5420dee59163d1572877e80701bdfbb6a72a4c0e36ba8d60b1c9eb7d0e75328",
+      "data/benchmarks/hotpotqa/questions.jsonl": "e1a46c3b646a3c0043c06e15de431db928d1d766acda472b6561cd10dcfce4cd",
+      "data/benchmarks/msmarco/questions.jsonl": "9e35c796bc88f6026579b51960a867a5387a2bcc0ef98c3f84202904dfa6cbed",
+      "data/benchmarks/nq/questions.jsonl": "d07db3240e3b9100e3e2fa106aa40947b49ca0a1d6c860baf784b0c538e1fba4"
+    },
+    "python": "3.14.3",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "processor": "arm",
+    "dependencies": {
+      "embedguard": "1.2.0",
+      "numpy": "2.5.1",
+      "scipy": "1.18.0",
+      "scikit-learn": "1.9.0",
+      "pydantic": "2.13.4",
+      "loguru": "0.7.3"
+    },
+    "timing": {
+      "clock": "time.perf_counter",
+      "implementation": "mach_absolute_time()",
+      "resolution_seconds": 4.166666666666666e-08,
+      "monotonic": true,
+      "adjustable": false,
+      "repetitions_per_sample": 1,
+      "scope": "single-threaded detector calls; host- and load-dependent"
     }
   }
 }

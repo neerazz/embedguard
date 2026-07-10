@@ -1,14 +1,9 @@
 """
 Layer 3: Retrieval Distributional Analysis.
 
-This module implements incremental PCA-based anomaly detection for monitoring
-the statistical distribution of retrieved documents in embedding space.
-
-Performance (from paper):
-    - PCA anomaly score: 2.8ms per query
-    - KL divergence computation: 0.5ms
-    - Rank correlation: 0.2ms
-    - Accuracy: 91.7% (cross-layer)
+This experimental module combines simplified PCA reconstruction error,
+regularized Mahalanobis distance, and temporal rank correlation. It is not
+exercised by the open Tier-2 benchmark.
 """
 
 import hashlib
@@ -23,10 +18,11 @@ from embedguard.types import Document
 
 
 class IncrementalPCA:
-    """Incremental PCA for streaming embedding analysis.
+    """Simplified bounded-window PCA for streaming embedding analysis.
 
-    This implements an efficient incremental PCA that can be updated
-    with new data without recomputing from scratch.
+    New rows accumulate in a bounded buffer. Once warm-up is reached, each
+    scheduled update recomputes SVD over that window; this is not a true
+    incremental-SVD implementation.
 
     Attributes:
         n_components: Number of principal components
@@ -68,33 +64,35 @@ class IncrementalPCA:
             self.components = np.zeros((self.n_components, n_features))
             self.singular_values = np.zeros(self.n_components)
 
-        # Update mean incrementally
-        col_mean = np.mean(X, axis=0)
-        col_var = np.var(X, axis=0)
+        if X.shape[1] != self.mean.shape[0]:
+            raise ValueError("PCA feature dimension changed")
+        assert self.components is not None
+        assert self.singular_values is not None
 
-        if self.n_samples_seen == 0:
-            self.mean = col_mean
-        else:
-            # Welford's online algorithm for mean
-            old_mean = self.mean.copy()
-            self.mean = (
-                self.n_samples_seen * self.mean + n_samples * col_mean
-            ) / (self.n_samples_seen + n_samples)
+        # Retain a bounded window so every SVD update sees accumulated rows,
+        # not only the latest query batch.
+        self._batch_buffer.append(X.copy())
+        accumulated = np.vstack(self._batch_buffer)
+        if len(accumulated) > self.batch_size:
+            accumulated = accumulated[-self.batch_size :]
+            self._batch_buffer = [accumulated]
 
-        # Center the data
-        X_centered = X - self.mean
+        self.n_samples_seen += n_samples
+        self.mean = np.mean(accumulated, axis=0)
 
-        # SVD update (simplified - full implementation would use incremental SVD)
+        # Simplified bounded-window SVD; this is intentionally not presented as
+        # a production incremental-SVD implementation.
         if self.n_samples_seen >= self.batch_size:
             try:
+                X_centered = accumulated - self.mean
                 U, S, Vt = np.linalg.svd(X_centered, full_matrices=False)
                 n_comp = min(self.n_components, len(S))
+                self.components.fill(0.0)
+                self.singular_values.fill(0.0)
                 self.components[:n_comp] = Vt[:n_comp]
                 self.singular_values[:n_comp] = S[:n_comp]
             except np.linalg.LinAlgError:
                 logger.warning("SVD did not converge, keeping previous components")
-
-        self.n_samples_seen += n_samples
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -147,12 +145,13 @@ class RetrievalDistributionalAnalyzer:
     This implements Layer 3 of the EmbedGuard architecture. It monitors
     the statistical distribution of retrieved documents using:
     1. Incremental PCA for dimension reduction
-    2. KL divergence between expected and observed distributions
+    2. Mahalanobis distance between expected and observed distributions
     3. Temporal rank correlation analysis
 
     Attributes:
         n_components: Number of PCA components
-        kl_threshold: KL divergence threshold for anomaly
+        kl_threshold: Legacy configuration field retained for API compatibility;
+            the current Mahalanobis scorer does not use it directly
         history_size: Number of queries to maintain in history
         pca: Incremental PCA model
         baseline_distribution: Expected distribution from training
@@ -176,7 +175,7 @@ class RetrievalDistributionalAnalyzer:
 
         Args:
             n_components: PCA components (k=50 in paper)
-            kl_threshold: KL divergence threshold
+            kl_threshold: Legacy threshold field retained for compatibility
             rank_correlation_min: Minimum expected rank correlation
             history_size: Number of queries to track
             update_frequency: Update PCA every N queries
@@ -243,13 +242,16 @@ class RetrievalDistributionalAnalyzer:
         scores.append(pca_score)
         confidences.append(pca_conf)
 
-        # 2. KL divergence analysis
+        # 2. Distribution-distance analysis. The private method name is retained
+        # for compatibility, but the implementation computes Mahalanobis distance.
         kl_score, kl_conf, kl_details = self._kl_divergence_score(embeddings)
+        details["distribution_distance"] = kl_details
         details["kl_divergence"] = kl_details
         scores.append(kl_score)
         confidences.append(kl_conf)
 
-        # 3. Rank correlation analysis
+        # 3. Rank correlation analysis. Every query contributes history;
+        # evaluation starts only after the warm-up window is populated.
         if len(self.score_history) >= 10:
             rank_score, rank_conf, rank_details = self._rank_correlation_score(
                 documents
@@ -257,6 +259,16 @@ class RetrievalDistributionalAnalyzer:
             details["rank_correlation"] = rank_details
             scores.append(rank_score)
             confidences.append(rank_conf)
+        else:
+            details["rank_correlation"] = {
+                "status": "warming_up",
+                "history_size": len(self.score_history),
+                "required_history": 10,
+            }
+
+        current_scores = self._document_scores(documents)
+        if current_scores:
+            self.score_history.append(current_scores)
 
         # Update history
         query_hash = hashlib.sha256(query.encode()).hexdigest()[:16]
@@ -310,9 +322,11 @@ class RetrievalDistributionalAnalyzer:
         # Fit PCA if needed
         if self.pca.n_samples_seen < self.pca.batch_size:
             self.pca.partial_fit(embeddings)
-            details["status"] = "warming_up"
-            details["samples_seen"] = self.pca.n_samples_seen
-            return 0.0, 0.3, details
+            if self.pca.n_samples_seen < self.pca.batch_size:
+                details["status"] = "warming_up"
+                details["samples_seen"] = self.pca.n_samples_seen
+                return 0.0, 0.3, details
+            details["status"] = "ready"
 
         try:
             # Compute reconstruction error
@@ -431,6 +445,19 @@ class RetrievalDistributionalAnalyzer:
             logger.error(f"Mahalanobis distance error: {e}")
             return 0.0, 0.0, {"error": str(e)}
 
+    @staticmethod
+    def _document_scores(documents: List[Document]) -> List[float]:
+        """Extract comparable retrieval scores for temporal analysis."""
+        scores = []
+        for doc in documents:
+            if doc.metadata.get("similarity_score") is not None:
+                scores.append(float(doc.metadata["similarity_score"]))
+            elif doc.embedding is not None:
+                scores.append(float(np.linalg.norm(doc.embedding)))
+            else:
+                scores.append(0.0)
+        return scores
+
     def _rank_correlation_score(
         self, documents: List[Document]
     ) -> Tuple[float, float, Dict[str, Any]]:
@@ -445,26 +472,15 @@ class RetrievalDistributionalAnalyzer:
             details["status"] = "insufficient_history"
             return 0.0, 0.3, details
 
-        # Get similarity scores from documents (or compute from embeddings)
-        current_scores = []
-        for doc in documents:
-            if doc.metadata.get("similarity_score") is not None:
-                current_scores.append(doc.metadata["similarity_score"])
-            elif doc.embedding is not None:
-                # Use embedding norm as proxy
-                current_scores.append(np.linalg.norm(doc.embedding))
-            else:
-                current_scores.append(0.0)
+        current_scores = self._document_scores(documents)
 
         if not current_scores:
             return 0.0, 0.0, {"error": "No scores available"}
 
-        self.score_history.append(current_scores)
-
         # Compute rank correlation with recent history
-        if len(self.score_history) >= 2:
+        if self.score_history:
             try:
-                prev_scores = self.score_history[-2]
+                prev_scores = self.score_history[-1]
 
                 # Pad to same length
                 max_len = max(len(current_scores), len(prev_scores))
@@ -472,14 +488,19 @@ class RetrievalDistributionalAnalyzer:
                 prev_padded = prev_scores + [0.0] * (max_len - len(prev_scores))
 
                 # Spearman rank correlation
-                correlation, p_value = stats.spearmanr(curr_padded, prev_padded)
+                correlation_raw, p_value_raw = stats.spearmanr(
+                    curr_padded, prev_padded
+                )
+                correlation = float(np.asarray(correlation_raw).item())
+                p_value = float(np.asarray(p_value_raw).item())
 
                 if np.isnan(correlation):
                     correlation = 0.0
 
                 # Low correlation = potential manipulation
                 # Score: 1 - correlation (higher = more suspicious)
-                score = max(0, (1 - correlation) / 2)  # Normalize to 0-0.5 range
+                # Map correlation from [-1, 1] to anomaly score [1, 0].
+                score = max(0, (1 - correlation) / 2)
                 if correlation < self.rank_correlation_min:
                     score = min(score + 0.3, 1.0)  # Boost if below threshold
 
@@ -489,6 +510,7 @@ class RetrievalDistributionalAnalyzer:
                 details["p_value"] = float(p_value) if not np.isnan(p_value) else None
                 details["threshold"] = self.rank_correlation_min
                 details["below_threshold"] = correlation < self.rank_correlation_min
+                details["status"] = "evaluated"
 
                 return score, confidence, details
 

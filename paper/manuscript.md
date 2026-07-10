@@ -8,13 +8,15 @@ Independent Researcher, California, USA
 
 **Competing Interests:** The author is an employee of Parafin. This work was conducted independently and is not affiliated with the author's employer.
 
-**Ethics Statement:** This research involves security evaluation of AI systems using synthetic attack data generated exclusively for defensive research purposes. All attack implementations follow responsible disclosure principles: (1) No real-world exploitation—all testing conducted on isolated systems; (2) Sanitized artifacts—attack patterns provided in defanged form; (3) Dual-use awareness—detection mechanisms included alongside attack patterns; (4) No human subjects—IRB approval not required; (5) Beneficial intent—research aims to improve AI security for healthcare, financial services, and legal research applications. Institutional review determined this research is exempt from full ethics board review (Category 4: Secondary data analysis).
+Post-publication manuscript version: 3.1
+
+**Ethics Statement:** This research evaluates defensive AI-security mechanisms using synthetic attack strings and public benchmark queries. It involves no human participants, private personal data, or testing against live third-party systems. No institutional review was sought. Released attack artifacts are limited to inputs needed to reproduce the detector benchmark and are paired with the corresponding defensive implementation.
 
 ---
 
 ## Abstract
 
-Embedding-based Retrieval-Augmented Generation (RAG) systems are critical infrastructure for production AI applications, yet remain vulnerable to embedding space poisoning attacks that achieve disproportionate success with minimal payloads: PoisonedRAG demonstrates 90% attack success with five malicious texts in corpora of millions, and Phantom shows single-document attacks succeeding black-box against commercial RAG applications. The threat class is now formally catalogued by industry — OWASP LLM08:2025 (Vector and Embedding Weaknesses), MITRE ATLAS AML.T0070 (RAG Poisoning), and NIST AI 100-2e2025 — and has produced production CVEs, including CVE-2025-32711 (EchoLeak) against Microsoft 365 Copilot. Current defenses optimize for isolated attack surfaces, leaving them vulnerable to coordinated attacks that distribute adversarial signals across architectural layers. EmbedGuard is a cross-layer detection framework that fuses anomaly signals from all four RAG architectural layers — prompt injection detection, TEE-based embedding attestation, retrieval distributional analysis, and output consistency verification — into a single correlated detection decision, and binds embedding provenance to a hardware root of trust. We report two evaluation tiers. On a production-scale deployment (500,000 embeddings, 47,000 queries, AMD SEV-SNP hardware), the framework achieves 94.7% detection of optimization-based attacks and 89.3% against adaptive attacks at 3.2% false positive rate and 51ms mean latency overhead, with ablation attributing an 18.4 percentage point improvement to cross-layer correlation over the best single layer. On the openly released EmbedGuard Benchmark v1.0 (Natural Questions, HotpotQA, MS-MARCO, and a 25-category injection attack dataset; N=135), the prompt-layer detector alone achieves 100% detection (30/30) with 0% false positives (0/105) at sub-millisecond latency, reproducible on commodity hardware from the released code. Complete implementation, benchmark datasets, and reproducibility scripts are released (Zenodo concept DOI: 10.5281/zenodo.18364919).
+Embedding-based Retrieval-Augmented Generation (RAG) systems remain vulnerable to corpus poisoning and prompt injection across multiple architectural stages. EmbedGuard proposes a four-layer reference architecture combining prompt detection, embedding provenance, retrieval-distribution monitoring, output-consistency analysis, and a deterministic correlation decision. The target provenance protocol uses an AMD SEV-SNP trust root, while the released package provides only an HMAC software simulation of that protocol; retrieval and output modules are experimental prototypes. The open Tier-2 regression benchmark (N=135) exercises only the 83-pattern prompt detector and observes 30/30 included attacks detected and 0/105 benign queries flagged, with two-sided 95% Wilson intervals of 88.6%-100% for detection and 96.5%-100% for specificity. These fixed, mostly one-example attack categories measure regression-set coverage rather than generalization, corpus-poisoning resistance, hardware attestation, or cross-layer benefit. The IJCESEN version of record separately reports a production-scale four-layer evaluation and an 18.4 percentage-point ablation gain, but the raw predictions, production corpus, baseline configurations, and hardware-attestation logs for that evaluation are not contained in this repository; this revision therefore treats those numbers as archived publication claims rather than independently reproduced evidence. The implementation, Tier-2 inputs, and reproduction scripts are released under Zenodo concept DOI 10.5281/zenodo.18364919.
 
 **Keywords:** Retrieval-Augmented Generation Security, Embedding Space Poisoning, Cross-Layer Attack Detection, Trusted Execution Environments, Cryptographic Provenance Attestation
 
@@ -48,20 +50,20 @@ The fundamental limitation of single-layer defenses lies in their optimization f
 
 ### 1.4 Contributions
 
-To address these limitations, we present EmbedGuard, a cross-layer detection framework with integrated hardware-backed attestation for RAG systems. Layered RAG defenses have begun to appear — frameworks that stack prompt-injection filters (Saleem et al., 2026), orchestrate independent per-layer defenses (Pallerla et al., 2026), or combine embedding anomaly detection with response verification (Ramakrishnan & Balaji, 2025) — and software-signature schemes for embedding provenance have been proposed (Wanger, 2026). EmbedGuard differs from these on two axes: it *fuses* anomaly signals from all four RAG architectural layers into a single correlated detection decision rather than running layers as independent filters, and it anchors embedding provenance in a *hardware* root of trust rather than software signatures. The framework makes the following contributions:
+To address these limitations, we present EmbedGuard, a cross-layer reference architecture with a target hardware-attestation design for RAG systems. Layered RAG defenses have begun to appear — frameworks that stack prompt-injection filters (Saleem et al., 2026), orchestrate independent per-layer defenses (Pallerla et al., 2026), or combine embedding anomaly detection with response verification (Ramakrishnan & Balaji, 2025) — and software-signature schemes for embedding provenance have been proposed (Wanger, 2026). EmbedGuard differs from these on two axes: it proposes fusion of anomaly signals from all four RAG architectural layers into one decision rather than independent filters, and it proposes moving embedding-provenance signing into a hardware root of trust. The released package implements the fusion logic and a software HMAC simulation of the provenance protocol; it does not implement AMD SEV-SNP attestation. The framework makes the following contributions:
 
-**Cross-Layer Signal Fusion:** To our knowledge, EmbedGuard is the first defense that fuses anomaly signals from all four RAG architectural layers — prompt analysis, embedding attestation, retrieval monitoring, and output verification — into a single correlated detection decision targeting adversarial embedding attacks. Prior layered defenses either target prompt injection specifically, orchestrate independent per-layer defenses without signal fusion, or operate at a single stage. The fusion design detects attacks whose signals appear benign at each layer individually but indicate coordination when analyzed collectively.
+**Cross-Layer Signal Fusion:** The literature scan in Section 2.4 found close layered systems but no prior system with this exact four-signal fusion and TEE-rooted provenance combination. That is a scoped integration claim, not a claim that layered RAG defense or provenance was invented here. The current deterministic engine combines confidence-weighted consensus, a strongest-signal floor, and a multi-layer correlation boost.
 
-**Hardware-Backed Provenance Attestation:** We present a hardware-backed attestation scheme for embedding generation, binding embedding provenance to a TEE-attested (AMD SEV-SNP) execution environment. This extends software-signature provenance approaches with a hardware root of trust and runtime attestation of the embedding model itself, transforming embedding security from a statistical inference problem into a cryptographic verification problem: attackers must compromise hardware security rather than evade statistical detection.
+**Hardware-Rooted Provenance Design:** We specify a target AMD SEV-SNP protocol that binds document, model, vector, and platform measurements. If implemented with real attestation verification, this would provide integrity and provenance against post-ingestion vector tampering or unauthorized embedding insertion. It would not prove that an authorized source document is benign or true; malicious inputs admitted through an approved ingestion path can still receive valid provenance.
 
-**Reproducible Benchmark Evaluation:** Comprehensive evaluation on the EmbedGuard Benchmark v1.0—comprising Natural Questions, HotpotQA, MS-MARCO, and a curated 25-category injection attack dataset—demonstrates 100% detection rate (30/30 attacks) with 0% false positive rate (0/105 benign queries) at 0.04ms mean latency. Statistical significance confirmed via Wilcoxon signed-rank test (p < 0.001). Complete code, datasets, and evaluation scripts are released with one-command reproducibility:
+**Reproducible Benchmark Evaluation:** Evaluation on the EmbedGuard open regression set—comprising locally curated Natural Questions-style, HotpotQA-style, and MS-MARCO-style benign files plus a curated 25-category injection file—observes 30/30 included attacks detected and 0/105 included benign queries flagged for the released pattern-only prompt detector. The 95% Wilson intervals are 88.6%-100% for detection and 96.5%-100% for specificity. The named benign files lack upstream IDs and extraction manifests, and mostly one-sample attack categories do not establish generalization. Complete code, inputs, and evaluation scripts are released with one-command repeatability:
 ```bash
 git clone https://github.com/neerazz/embedguard && cd embedguard && ./reproduce.sh
 ```
 
-**Attack Coverage Analysis:** Systematic evaluation across 25 distinct attack categories including direct injection, jailbreak attempts, encoding obfuscation (Unicode, Base64), delimiter confusion, XML/Markdown injection, hypothetical/fictional framing, translation attacks, authority claims, emotional manipulation, RAG-specific attacks, composite multi-vector attacks, and subtle manipulation demonstrates robust detection across all categories with per-category detection scores ranging from 0.80 to 1.0.
+**Attack Coverage Analysis:** The fixed regression set contains 25 attack categories including direct injection, jailbreak attempts, encoding obfuscation (Unicode, Base64), delimiter confusion, XML/Markdown injection, hypothetical/fictional framing, translation attacks, authority claims, emotional manipulation, RAG-specific attacks, composite multi-vector attacks, and subtle manipulation. All included samples are detected with scores from 0.80 to 1.0; mostly one-sample categories do not establish category-level generalization.
 
-**Flexible Deployment Framework:** Three operational modes (passive, gated, active) enable deployment across diverse organizational contexts with varying risk tolerances, regulatory requirements, and operational constraints, from resource-constrained environments to high-assurance applications.
+**Decision Policy Modes:** Three modes map scores to LOG, FLAG, or BLOCK decisions. The package returns those decisions; application code must implement logging, review queues, blocking, and fallbacks.
 
 The remainder of this paper is organized as follows: Section 2 provides background on RAG security and related work. Section 3 details the EmbedGuard architecture and detection mechanisms. Section 4 presents experimental evaluation and comparative analysis. Section 5 discusses applications, limitations, and societal implications. Section 6 concludes with future research directions.
 
@@ -94,9 +96,9 @@ Cost analysis reveals that remediation expenses are highest when poisoning affec
 
 Contemporary defense mechanisms employ various strategies to protect RAG systems from poisoning attacks. RAGuard employs a two-layer approach combining adversarial retriever training with perplexity-based filtering and text similarity analysis at the retrieval layer (Cheng et al., 2025). RobustRAG implements isolate-then-aggregate strategies with certifiable guarantees, using keyword-based voting across retrieved documents (Xiang et al., 2024). TrustRAG uses K-means cluster filtering combined with LLM self-assessment for malicious document detection (Zhou et al., 2025). More recently, ReliabilityRAG adopts a graph-theoretic perspective, identifying "consistent majority" documents through Maximum Independent Set computation on contradiction graphs with provable robustness guarantees (Shen et al., 2025). RAGDefender employs a post-retrieval approach using clustering-based grouping for single-hop queries and concentration-based analysis for multi-hop reasoning, achieving substantial attack success rate reductions (Kim et al., 2025). PoisonedRAG established foundational attack methodologies demonstrating that even minimal corpus contamination achieves disproportionate attack success through strategic embedding space positioning (Zou et al., 2024). RevPRAG introduces reverse prompt engineering for attack detection, achieving 98% true positive rate through query reconstruction analysis that identifies whether retrieved documents were designed to be retrieved for specific queries (Xiao et al., 2025).
 
-RevPRAG represents the current state-of-the-art in detection performance, achieving higher detection rates (98% TPR) than EmbedGuard's 94.7%. However, EmbedGuard provides complementary capabilities that RevPRAG does not address: hardware-backed cryptographic attestation via TEE ensures embedding provenance verification independent of statistical analysis, cross-layer signal correlation detects attacks distributing signatures across architectural layers, and provenance tracking enables forensic investigation of compromise timelines. These approaches are orthogonal and could potentially be combined for defense-in-depth strategies.
+Among the detectors reviewed here, RevPRAG reports the highest true-positive rate (98%), above EmbedGuard's Tier-1 94.7% reference result. The numbers are not a head-to-head comparison because the systems use different evaluations. EmbedGuard instead targets complementary capabilities that RevPRAG does not evaluate: hardware-rooted embedding provenance, cross-layer signal correlation, and provenance tracking for forensic investigation. A shared benchmark is required before ranking the systems directly.
 
-Despite these advances, existing defenses operate primarily at individual architectural abstraction levels, lacking cross-layer correlation capabilities essential for detecting distributed attacks. Analysis of backdoor attacks on natural language generation provides insights into how adversaries embed backdoors at different abstraction levels—malicious training data provision, model parameter manipulation, and inference-time triggers (Fan et al., 2021). Studies demonstrate that data poisoning backdoors prove particularly challenging to detect as they exploit the model's learning process, typically assumed to be trustworthy.
+Despite these advances, many evaluated defenses operate at one or two architectural levels. Recent concurrent work spans multiple stages, but shared-benchmark evidence for correlated four-layer decisions remains absent. Analysis of backdoor attacks on natural language generation provides insights into how adversaries embed backdoors at different abstraction levels—malicious training data provision, model parameter manipulation, and inference-time triggers (Fan et al., 2021). Studies demonstrate that data poisoning backdoors prove particularly challenging to detect as they exploit the model's learning process, typically assumed to be trustworthy.
 
 ### 2.4 Layered Defenses and Provenance Approaches
 
@@ -131,184 +133,186 @@ The concentration of measure phenomenon explains distance-based anomaly detectio
 
 ### 3.1 Architectural Overview
 
-EmbedGuard implements a unified framework for reasoning about security signals across all four layers of the RAG system architecture, integrating low-latency streaming analysis alongside standard inference pipelines to maintain production system viability. The architecture enables deployment in scenarios with strict latency requirements where serialized security checks would prove prohibitive. The system employs a multi-stage detection pipeline where each stage performs independent security checks and reports to a central correlation engine that identifies distributed attacks across architectural modules.
+EmbedGuard implements a reference framework for reasoning about security signals across four RAG layers. The released code executes the enabled checks sequentially and contributes their signals to a deterministic correlation engine; the open benchmark measures only the pattern-based prompt path and does not establish full-pipeline production latency or throughput.
 
 ![Figure 1: EmbedGuard cross-layer detection architecture](images/figure_1.png)
 
-*Figure 1: EmbedGuard cross-layer detection, traced through a worked attack. An attacker plants a fluent poisoned document in the knowledge corpus (red dashed path); a benign user query (blue path) then retrieves the poisoned embedding. Each detection layer emits an anomaly signal for this example — the prompt layer sees a clean query (s₁ = 0.1), embedding attestation finds no valid TEE certificate (s₂ = 1.0), retrieval analysis detects a shifted similarity distribution (s₃ = 0.8), and output verification observes answer instability under perturbation (s₄ = 0.7). No single moderate signal crosses the block threshold; the weighted fusion (ThreatScore = 1.225 ≥ 0.85) does, and the query is blocked with a safe fallback response.*
+*Figure 1: EmbedGuard cross-layer detection, traced through an illustrative attack. An attacker plants a fluent poisoned document in the knowledge corpus (red dashed path); a benign user query (blue path) then retrieves the poisoned embedding. The prompt layer sees a clean query (s₁ = 0.1), the provenance layer finds no valid evidence (s₂ = 1.0), retrieval analysis detects a shifted similarity distribution (s₃ = 0.8), and the output proxy observes answer instability under perturbation (s₄ = 0.7). With unit confidence for the illustration, the current package computes weighted consensus 1.325/1.80 = 0.736, applies a strongest-signal floor of 1.000, adds the 0.150 three-layer correlation boost, and clips the final score to 1.000; active mode therefore returns BLOCK at the 0.85 threshold. The values are illustrative signals executed through the current fusion code, not measured layer outputs.*
 
-**Table 3: EmbedGuard Security Requirements**
+**Current implementation and evidence status:**
+
+| Component | v1.2 implementation status | Open evidence status |
+|-----------|----------------------------|----------------------|
+| Prompt detector | Implemented; 83-pattern path; neural mode is disabled by default and its fine-tuned checkpoint is not published | Exercised by the 135-sample Tier-2 regression benchmark |
+| Embedding provenance | HMAC software simulator; target SEV-SNP protocol is design-only | Tamper-path unit tests; no hardware attestation evidence |
+| Retrieval analyzer | Experimental PCA, Mahalanobis-distance, and temporal-rank prototype | Unit-tested state path; no attack-detection benchmark |
+| Output verifier | Synthetic-output proxy; optional same-generator callback path | No dedicated open evaluation or deployed-LLM benchmark |
+| Correlation engine | Implemented deterministic consensus/floor/boost algorithm | Unit-tested; no open four-layer ablation |
+
+<p class="table-caption"><strong>Table 3: EmbedGuard Security Requirements</strong></p>
 
 | Requirement | Description | Verification Method |
 |-------------|-------------|---------------------|
 | SR-1: Integrity | Detect embedding space poisoning attempts before retrieval influences generation | Cross-layer signal fusion with weighted threshold |
-| SR-2: Provenance | Verify that embeddings originate from approved models and trusted document sources | TEE attestation certificate validation |
+| SR-2: Provenance | Bind embeddings to an approved model identifier and a specific document hash | Attestation-certificate validation; software-simulated in this release |
 | SR-3: Availability | Maintain system responsiveness under active attack conditions | Latency monitoring with <100ms target |
-| SR-4: Auditability | Provide forensic trail for security incident investigation | Comprehensive logging in passive/gated modes |
+| SR-4: Auditability | Expose layer details for caller-owned incident records | Returned decision/layer details; log retention is caller-owned |
 
 ### 3.2 Layer 1: Prompt Injection Detection
 
-The prompt layer performs semantic analysis to identify injection attempts and jailbreak patterns before input enters the retrieval pipeline. Recent research on universal adversarial attacks demonstrates systematic vulnerabilities in language model input processing, enabling adversaries to use specially crafted prompt suffixes to elicit malicious model outputs (Zou et al., 2023; Carlini et al., 2023). Adversarial prompts exhibit contextual signatures of malicious intent, including semantic content violations, unusual mixing of benign text with instruction-like prompts, syntactically anomalous patterns consistent with prompt engineering, and semantic gaps between user intent and prompt parameters.
+The released prompt layer performs lexical pattern analysis to identify selected injection attempts and jailbreak strings before input enters the retrieval pipeline. Recent research on universal adversarial attacks demonstrates systematic vulnerabilities in language model input processing, enabling adversaries to use specially crafted prompt suffixes to elicit malicious model outputs (Zou et al., 2023; Carlini et al., 2023). The implementation does not infer user intent or provide a trained semantic classifier by default.
 
-The prompt analyzer employs a pattern-based classifier using 81 detection patterns covering diverse attack categories. The classifier employs hierarchical pattern matching with weighted scoring: matched patterns contribute to a cumulative score using the formula score = min(0.75 + (num_matches × 0.05), 1.0), where the 0.70 threshold balances sensitivity and specificity. Detection targets include direct instruction injection, jailbreak attempts, instruction smuggling, context manipulation, prompt leaking, role manipulation, indirect injection, encoding obfuscation (Unicode, Base64), delimiter confusion, XML/Markdown injection, hypothetical/fictional framing, translation attacks, authority claims, emotional manipulation, RAG-specific attacks, composite multi-vector attacks, and subtle manipulation. Benchmark evaluation demonstrates 100% detection accuracy (30/30 attacks detected) with 0% false positive rate (100/100 benign queries correctly classified) at 0.08ms mean latency per query.
+The prompt analyzer employs a pattern-based classifier using 83 detection patterns covering diverse attack categories. It matches both the original query and a normalized representation that strips zero-width characters, applies Unicode NFKC normalization, and removes whitespace. Matched patterns contribute to a cumulative score using score = min(0.75 + (num_matches × 0.05), 1.0), with a 0.70 decision threshold. Detection targets include direct instruction injection, jailbreak attempts, instruction smuggling, context manipulation, prompt leaking, role manipulation, indirect injection, encoding obfuscation (Unicode, Base64), delimiter confusion, XML/Markdown injection, hypothetical/fictional framing, translation attacks, authority claims, emotional manipulation, RAG-specific attacks, composite multi-vector attacks, and subtle manipulation. The current open benchmark observes 30/30 attacks detected and 0/105 benign queries flagged at 0.09ms aggregate mean latency on the recorded commodity-hardware run.
 
 Detection signals from the prompt layer receive intermediate confidence weighting (beta_1 = 0.35) in the correlation engine due to probabilistic detection characteristics and potential for false positives on legitimate unusual queries. While prompt-layer detection prevents adversaries from using crafted queries to surface poisoned content, it provides insufficient protection against embedding-space poisoning, where legitimate queries unknowingly trigger the retrieval of malicious documents.
 
-**Table 4: Attack Pattern Taxonomy (81 patterns)**
+**Table 4: Attack Pattern Taxonomy (83 patterns)**
 
-| Category | Count | Example Signatures | Detection Weight |
-|----------|-------|-------------------|------------------|
-| Direct Injection | 3 | `ignore.*previous`, `disregard.*prior` | 0.95 |
-| Role Manipulation | 5 | `you are now.*`, `pretend to be`, `act as` | 0.90 |
-| System Extraction | 2 | `show your prompt`, `reveal instructions` | 0.85 |
-| Delimiter Attacks | 4 | `[INST]`, `<\|im_start\|>`, `### System` | 0.90 |
-| Encoding Bypass | 3 | `base64`, `rot13`, `hex encode` | 0.80 |
-| Jailbreak Keywords | 2 | `DAN mode`, `developer mode` | 0.95 |
-| Unicode Obfuscation | 8 | Homoglyphs, zero-width chars | 0.75 |
-| Context Manipulation | 6 | Priority claims, override attempts | 0.80 |
-| Framing Attacks | 12 | Hypothetical, fictional, translation | 0.70 |
-| Social Engineering | 8 | Authority, emotional, urgency | 0.75 |
-| RAG-Specific | 15 | Document injection, retrieval manipulation | 0.85 |
-| Composite Patterns | 13 | Multi-vector combinations | 0.90 |
-| **Total** | **81** | — | — |
+| Category | Example signatures |
+|----------|--------------------|
+| Direct injection | `ignore ... previous instructions`, `disregard ... prior` |
+| Role manipulation | `you are now ...`, `pretend to be`, `act as` |
+| System extraction | `show your prompt`, `reveal instructions` |
+| Delimiter attacks | `[INST]`, `<\|im_start\|>`, `### System` |
+| Encoding bypass | `base64`, `rot13`, hexadecimal payloads |
+| Jailbreak keywords | `DAN`, `developer mode`, `bypass safety` |
+| Unicode and obfuscation | zero-width characters, repeated or split payloads |
+| Context manipulation | priority claims, overrides, new directives |
+| Framing attacks | hypothetical, fictional, translation, role-play |
+| Social engineering | authority, emotional, and urgency claims |
+| RAG-specific injection | retrieval-time instructions and document-context markers |
+| Composite patterns | multi-vector combinations |
 
 The full pattern taxonomy and regex definitions are available in `embedguard/prompt_detector/__init__.py` (`INJECTION_PATTERNS`).
 
 ### 3.3 Layer 2: Cryptographic Embedding Attestation
 
-EmbedGuard's core contribution is the embedding layer, which integrates hardware-based cryptographic attestation of embedding provenance. Previous approaches assume retrieval systems store vectors generated by embedding models using specific documents as input, but do not verify this assumption in practice. Trusted Execution Environments provide hardware infrastructure for secure computation with cryptographic proof of correctness, offering isolated spaces for sensitive calculations protected from privileged system software (AMD, 2024; Wilke et al., 2024).
+EmbedGuard's architectural proposal uses hardware-rooted attestation to bind an embedding to its source document, model, output vector, time, and execution platform. Trusted Execution Environments can isolate computation from privileged system software and produce platform evidence (AMD, 2024; Wilke et al., 2024). The following is the target protocol described by the IJCESEN version of record; it is not implemented by the repository's software simulator.
 
-**TEE-Based Embedding Generation Protocol:**
+**Target TEE-Based Embedding Generation Protocol:**
 
-Legitimate embeddings are generated entirely within TEE-protected enclaves following this protocol:
+In a hardware deployment, legitimate embeddings would be generated inside a measured SEV-SNP confidential VM:
 
-1. **Enclave Initialization:** Embedding model (all-mpnet-base-v2, 768 dimensions) and source documents are loaded into protected memory isolated from system software.
+1. **Confidential-Guest Initialization:** Embedding model (all-mpnet-base-v2, 768 dimensions) and source documents are loaded into encrypted guest memory protected from the hypervisor.
 
-2. **Isolated Computation:** Vector generation executes in a hardware-isolated context inaccessible to privileged software. The TEE maintains cryptographic measurements of executing code and model weights.
+2. **Isolated Computation:** Vector generation executes in a hardware-isolated context. SEV-SNP supplies a launch measurement for the guest image; the protocol separately binds the approved model hash because dynamically loaded model weights are not automatically covered by that launch measurement.
 
-3. **Attestation Certificate Generation:** The TEE produces a cryptographically signed certificate binding:
+3. **Report Binding:** The verifier issues a fresh challenge nonce `N` and records it in a replay cache. The confidential guest computes `E = f_Model(D)` and a binding value `B = H(H(D) || H(Model) || H(E) || T || N)`, places `B` in the SEV-SNP report-data field, and requests an attestation report. The AMD Secure Processor signs a report that includes the report-data binding plus platform evidence such as launch measurement, policy, and TCB version. The bound metadata contains:
    - Input document hash: H(D)
    - Embedding model hash: H(Model)
-   - Output vector: E
+   - Output vector hash: H(E)
    - Timestamp: T
-   - Hardware platform measurements: PCR values
+   - Verifier challenge nonce: N
+   - AMD SEV-SNP report fields such as launch measurement, policy, and TCB version
 
-The attestation signature is hardware-protected using keys inaccessible to system software, enabling downstream verification that embeddings originated from approved models over authentic inputs.
+The platform attestation key is not an application signing key inside the guest; downstream verification relies on AMD's VCEK endorsement chain and the report-data binding.
 
 **Verification at Retrieval Time:**
 
-During retrieval operations, EmbedGuard validates attestation certificates through:
-- Signature Verification: Cryptographic validation using TEE public keys
-- Model Integrity Confirmation: Verification that approved embedding models generated vectors
-- Temporal Validity Checks: Ensuring certificates remain within validity periods
-- Hardware Platform Validation: Confirming trusted platform configuration
+The target retrieval verifier would validate:
+- Endorsement and Signature: Validate the AMD ARK/ASK/VCEK chain, then verify the attestation-report signature with the validated VCEK
+- Binding: Recompute B from the document, approved model, embedding, timestamp, and challenge nonce and compare it with report data
+- Freshness Policy: Require an unused verifier-issued nonce, atomically mark it consumed, and reject reports outside the deployment's maximum-age window
+- Platform Policy: Check launch measurement, guest policy, and reported TCB against an allowlist
 
 ![Figure 2: TEE-based embedding attestation protocol](images/figure_2.png)
 
-*Figure 2: TEE-based embedding attestation protocol. Documents are hashed and loaded into the TEE enclave, which generates embeddings and cryptographic attestation certificates. At retrieval time, certificates are validated before accepting results.*
+*Figure 2: Target TEE-based embedding attestation protocol. Documents are hashed and loaded into a measured SEV-SNP confidential VM, which generates embeddings and requests attestation evidence; retrieval verifies that evidence before accepting vectors. The released repository provides a software HMAC simulator of the binding and verification flow, not an AMD SEV-SNP attestation implementation.*
+
+**Released Implementation Boundary:**
+
+`EmbeddingAttestationLayer` uses HMAC-SHA256 with a caller-supplied key or an ephemeral process key, a constant simulated model hash, document and embedding hashes, an ISO timestamp, and a validity period. Setting `tee_available=True` only adds clearly labeled simulated platform metadata; the code neither obtains an AMD SEV-SNP attestation report nor validates an endorsement chain. The simulator is useful for testing tamper detection and certificate plumbing, but it does not establish a hardware root of trust.
 
 **Security Properties:**
 
-Unauthenticated embeddings—including all adversarially injected vectors—deterministically fail verification, providing high detection rates for direct embedding injection attacks when TEE integrity is maintained. This transforms the security model from statistical evasion to hardware compromise, fundamentally shifting adversarial calculus. Embedding attestation receives high weighting (beta_2 = 0.75) in the correlation engine due to deterministic cryptographic guarantees.
+Within the simulator, missing certificates are marked unverified and document-hash, embedding-hash, model-hash, expiry, or HMAC failures invalidate a certificate. A real TEE deployment could move the trust boundary to hardware, but the open package does not demonstrate that property. The default correlation weight remains beta_2 = 0.75 because provenance failure is treated as the strongest layer signal.
 
 **Performance Characteristics:**
 
-Performance testing reveals a signature generation overhead of 1.8ms per embedding operation and a validation overhead of 0.3ms per retrieved document. Batch validation of 10 documents completes in 2.1ms through parallelization. While TEE-protected execution incurs measurable overhead during document ingestion (12.8ms per document, including memory encryption and certificate generation), this cost amortizes across document lifetime due to read-heavy access patterns typical of retrieval systems.
+The IJCESEN version of record reports 1.8ms signature generation, 0.3ms validation per retrieved document, 2.1ms batch validation for 10 documents, and 12.8ms ingestion overhead. Those Tier-1 measurements are retained as publication history; the current repository does not include the hardware environment or a script that reproduces them.
 
 ### 3.4 Layer 3: Retrieval Distributional Analysis
 
-The retrieval layer implements distributional analysis, detecting statistical deviations in query-document similarity distributions, employing three complementary mechanisms:
+The released retrieval analyzer combines three experimental signals. This layer is not exercised by the Tier-2 prompt benchmark, and the repository does not release a validated baseline corpus for its thresholds.
 
 **Incremental Principal Component Analysis:**
 
-The system maintains dynamically updated principal components of document-query similarity distributions using incremental PCA to avoid full corpus recomputation. This reduces computation from 847ms (batch PCA) to 15.2ms per query. Query similarity distributions project into PCA space (k=50 principal components, updated every 1,000 queries), with deviations from expected subspace indicating coordinated poisoning where multiple malicious documents alter retrieval distributions.
+`IncrementalPCA` retains a bounded window of embedding rows and recomputes a simplified SVD representation when its warm-up batch is reached and on scheduled updates. Until warm-up, the analyzer returns a zero PCA anomaly score with low confidence. After warm-up, reconstruction error is normalized to a [0,1] score. The default configuration retains 50 components, a 100-row fitting window, and schedules updates every 1,000 queries; the implementation is a research prototype rather than a production incremental-SVD algorithm.
 
 Mathematical formulation:
-- Given similarity vector s in R^n for n documents
-- Project: s_pca = U^T s where U are top-k eigenvectors
-- Anomaly score: ||s - UU^T s|| > tau_pca
+- Given centered embedding matrix X in R^(n x d) for n documents
+- Let V_k contain the top-k right singular vectors of the fitting window
+- Reconstruct: X_hat = (X V_k^T) V_k
+- Anomaly score: mean_i ||X_i - X_hat_i||_2, normalized by the implementation scale
 
-**Kullback-Leibler Divergence Monitoring:**
+**Distribution-Distance Monitoring:**
 
-The system computes the KL divergence between current and historical similarity score distributions:
-
-D_KL(P_current || P_historical) = sum P_current(x) log(P_current(x) / P_historical(x))
-
-Empirically calibrated threshold tau = 0.15 achieves 89.1% detection rate with 4.3% false positive rate. High divergence indicates retrieval behavior deviating from historical patterns, potentially from poisoned embeddings designed to interfere with retrieval.
+Despite the legacy internal name `_kl_divergence_score`, the released code computes a regularized Mahalanobis distance between the current mean embedding and an evolving baseline. It uses a diagonal approximation until enough samples exist for a covariance estimate, then applies a regularized pseudo-inverse. The repository does not reproduce the previously stated tau = 0.15, 89.1% detection, or 4.3% false-positive calibration claims, so they are not presented as current results.
 
 **Temporal Rank Correlation:**
 
-Spearman's rank correlation measures ranking stability across temporally proximate queries:
+After at least 10 historical observations, the analyzer computes a Spearman rank-correlation signal over retrieval scores. If the current and preceding score vectors have different lengths, the shorter vector is right-padded with zeros. SciPy's `spearmanr` then computes Pearson correlation over tie-aware average ranks:
 
-rho = 1 - (6 * sum(d^2)) / (n(n^2 - 1))
+rho = corr(rank_avg(pad_0(s_t)), rank_avg(pad_0(s_{t-1})))
 
-Where d represents rank differences. Benign retrieval exhibits rank stability for semantically similar queries (rho > 0.7), while poisoning attacks cause systematic rank inversions (rho < 0.3) as adversarial documents inappropriately surface for target queries.
-
-The system accounts for query semantic similarity and user session characteristics when evaluating expected consistency. Retrieval layer signals receive intermediate weighting (beta_3 = 0.50) due to a strong correlation with attacks but a statistical (non-deterministic) nature.
+If correlation is undefined for constant inputs, the implementation maps rho to 0. The rank anomaly is `max(0, (1 - rho) / 2)`; when rho is below the configured 0.30 minimum, it adds 0.30 and caps the result at 1.0. The current code combines PCA, distribution-distance, and rank signals with component weights 0.5, 0.3, and 0.2 when all are available. It does not condition on user-session semantics. Retrieval receives beta_3 = 0.50 in cross-layer fusion, but its attack-detection accuracy has not been independently reproduced by the open benchmark.
 
 ### 3.5 Layer 4: Output Consistency Verification
 
-The output layer detects attacks manifesting during generation through perturbation-based stability testing, building on research demonstrating that backdoored models exhibit sensitivity to small input perturbations (Fan et al., 2021).
+The output layer is a development proxy for perturbation-based stability testing, motivated by work showing that backdoored models can be sensitive to input perturbations (Fan et al., 2021). It is not an end-to-end LLM evaluation in the released repository.
 
 **Retrieval Perturbation Strategy:**
 
-EmbedGuard generates K=5 alternative retrieval sets through:
-- Reranking with alternative similarity metrics (cosine, dot product, L2)
-- Document substitution with near-neighbors (within +/-0.05 cosine distance)
-- Controlled ablation of top-k results
+The implementation generates K=5 document-set perturbations by cycling through document removal, document reordering, sentence/chunk removal, and small text-noise insertion.
 
-**Stability Measurement:**
+<p class="keep-with-next"><strong>Stability Measurement:</strong></p>
 
-The system executes generation with each perturbed set and measures output stability:
+By default, the implementation constructs deterministic synthetic text from document content for both the baseline and perturbed sets. For real-output testing, the caller must supply an `output_generator` callback that reruns the same generator on the original and every perturbed document set; an optional `generated_output` may serve as the baseline only when that callback is present. A real output supplied without generator access is marked `not_evaluated`, never compared against synthetic proxies. It then measures output stability:
 
 Stability = (1/K) * sum_{i=1}^{K} sim(output_original, output_i)
 
-Where sim() computes semantic similarity using sentence transformers.
-
-Benign queries produce stable outputs (>0.82) as perturbations preserve semantic content. Poisoning attacks exhibit instability (<0.65) as adversarial document removal fundamentally alters outputs. This relies on the assumption that benign queries maintain stable outputs given slight retrieval variations since similar documents present similar information, while attacks dependent on specific poisoned documents demonstrate sensitivity to their presence or absence.
-
-Output verification triggers only for queries with elevated threat signals from prior layers (<0.1% of traffic), imposing 6.3ms latency for affected queries while maintaining acceptable overall performance. Signals receive lower weighting (beta_4 = 0.20), acknowledging legitimate reasons for output variation.
+When the optional semantic model is explicitly enabled, sim() is cosine similarity in embedding space; the default path uses deterministic Jaccard word overlap and performs no model download. The default stability threshold is 0.65 and the returned anomaly score is one minus mean similarity. The open benchmark does not validate benign/attack separation, trigger frequency, or latency for this layer. Its lower fusion weight, beta_4 = 0.20, reflects the risk that ordinary output variation can look unstable.
 
 ### 3.6 Threat Correlation Engine
 
-The correlation engine fuses detection signals across layers using learned weighted scoring:
+The released correlation engine is deterministic; it does not contain a learned classifier or Bayesian posterior. For layer score s_i, confidence c_i, and default weight beta_i, it computes a confidence-weighted consensus and a fail-closed strongest-signal floor:
 
-ThreatScore = sum_{i=1}^{4} beta_i * signal_i
+consensus = (sum_i beta_i c_i s_i) / (sum_i beta_i c_i)
 
-where each signal_i is in [0, 1] representing normalized layer-specific anomaly scores. Weights beta_i are intentionally unnormalized (summing to 1.80) to allow ThreatScore values exceeding 1.0 when multiple layers simultaneously indicate attack presence. This design enables thresholding at calibrated decision boundaries: ThreatScore > 0.70 triggers flagging, ThreatScore > 0.85 triggers blocking in active mode.
+base = max(consensus, max_i(c_i s_i))
 
-**Table 3: Layer Weight Calibration**
+It then counts confidence-bearing elevated layers with c_i s_i > 0.5. For k elevated layers, the additive correlation factor is zero when k <= 1 and 0.075(k-1) otherwise, using the package default correlation boost of 0.15. Zero-confidence scores cannot contribute to this boost. The final score is min(1, base + correlation factor). Gated mode flags at a score of at least 0.70; active mode blocks at a score of at least 0.85 and flags scores from 0.70 to below 0.85.
 
-| Layer | Weight (beta) | Rationale | Latency Contribution |
-|-------|---------------|-----------|---------------------|
-| Prompt | 0.35 | Probabilistic but low false alarm | 4.2ms (8.2%) |
-| Embedding (TEE) | 0.75 | Deterministic cryptographic verification | 12.8ms (25.1%) |
-| Retrieval | 0.50 | Strong signal but statistical | 23.5ms (46.1%) |
-| Output | 0.20 | Legitimate reasons for instability | 6.3ms (12.4%) |
+**Table 5: Default Layer Weights in the Released Correlation Engine**
 
-Weights are calibrated empirically on held-out attack samples comprising 5,000 attacks across all categories to maximize separation between benign and malicious queries.
+| Layer | Weight (beta) | Rationale |
+|-------|---------------|-----------|
+| Prompt | 0.35 | Pattern and optional neural detection can produce false alarms |
+| Embedding provenance (HMAC simulator; TEE target) | 0.75 | Provenance failure is the strongest trust signal |
+| Retrieval | 0.50 | Distributional analysis is informative but statistical |
+| Output | 0.20 | Legitimate generation variance can cause instability |
+
+These defaults are implementation parameters, not a newly reproduced calibration result. The repository does not release the claimed 5,000-sample calibration set.
 
 **Cross-Layer Pattern Recognition:**
 
 The engine identifies attack signatures distributed across layers that appear benign individually but indicate coordinated attacks when correlated. Example detection pattern:
 - Linguistically fluent document (passes prompt layer)
-- Unauthenticated embedding (fails TEE attestation)
+- Unauthenticated embedding (fails provenance validation)
 - Distributional anomaly (fails retrieval analysis)
 - Output instability (fails consistency check)
 
-Combined signal: ThreatScore = 0.35(0.1) + 0.75(1.0) + 0.50(0.8) + 0.20(0.7) = 1.225 (high confidence attack)
-
-The correlation engine employs machine learning classifiers trained on multi-layer feature sets (187 features spanning all layers) to learn complex interaction patterns. Bayesian inference frameworks combine layer-specific detection confidences with prior probabilities based on query characteristics and user context, producing posterior attack probabilities that guide mitigation decisions.
+For the illustrative unit-confidence signals in Figure 1, the raw weighted sum is 1.325 and the weight total is 1.80, so consensus is 0.736. The strongest-signal floor is 1.000, three layers are elevated, and the 0.150 correlation factor is added before clipping; the package therefore returns a final score of 1.000 and BLOCK in active mode. This example demonstrates the code path rather than an empirical calibration result.
 
 ### 3.7 Operational Modes
 
 EmbedGuard supports three deployment modes accommodating diverse operational requirements:
 
-**Passive Mode:** All anomaly detections are logged without remediation actions, enabling security teams to establish a baseline understanding without service disruption. Each flagged transaction records complete context (prompt, retrieved documents with attestations, generated response, layer-specific signals) totaling 2.3-4.7 MB per incident. Temporal correlation links related incidents across sessions, revealing multi-stage attacks. Organizations typically establish alerting thresholds for high-confidence detections (posterior probability > 0.85), enabling rapid response without automated intervention.
+**Passive Mode:** The correlation engine always returns LOG, irrespective of score. This supports observation without automated intervention; downstream storage, retention, and incident-correlation behavior are deployment responsibilities rather than benchmarked package features.
 
-**Gated Mode:** High-confidence attacks (0.70-0.85 posterior probability) are flagged for manual review. The system pauses processing and presents security analysts with comprehensive context, including query, retrieval results, preliminary analysis, and recommended actions. Visualization tools display embedding space positions, provenance chains, perturbation stability comparisons, and temporal patterns. Average review time: 3-5 minutes per flagged query with visualization support versus 8-12 minutes without tools.
+**Gated Mode:** The engine returns FLAG at scores of at least 0.70 and ALLOW below 0.70. The package returns the decision and layer details; pausing a request, presenting a review interface, and measuring analyst review time require an external integration and are not evaluated here.
 
-**Active Mode:** Automatic blocking or fallback generation occurs when attack probabilities exceed thresholds (typically >0.85). The system returns safe responses without executing potentially malicious operations. Fallback strategies include generic non-committal responses or retrieval-free generation using only parametric knowledge. Requires careful threshold calibration to minimize false positive rates impacting user experience.
+**Active Mode:** The engine returns BLOCK at scores of at least 0.85, FLAG from 0.70 to below 0.85, and ALLOW below 0.70. The package does not itself generate a fallback response; the calling application owns that policy and must calibrate thresholds against its own traffic before enabling automatic blocking.
 
 ---
 
@@ -316,15 +320,15 @@ EmbedGuard supports three deployment modes accommodating diverse operational req
 
 We report results at two evaluation tiers with different reproducibility properties, and we are explicit about which claims each tier supports.
 
-**Tier 1 — Production-scale evaluation (reference results).** The full four-layer framework evaluated on a production-scale deployment: 500,000 embeddings spanning technical documentation, medical literature, legal texts, and encyclopedic knowledge; 47,000 evaluation queries; AMD SEV-SNP hardware for the attestation layer. This tier exercises all four layers against four attack families (optimization-based, transferability-based, semantic manipulation, adaptive) and supports the cross-layer correlation and comparative claims. Reproducing this tier requires TEE-capable hardware and a production-scale corpus; it is documented here as the reference evaluation (see also the published version of record, DOI 10.22399/ijcesen.4869).
+**Tier 1 — Archived version-of-record claims.** The IJCESEN article reports a production-scale four-layer evaluation on 500,000 embeddings and 47,000 queries with AMD SEV-SNP hardware. The repository does not contain the raw predictions, production corpus, attack generator, baseline configurations, or attestation logs required to audit that experiment. Tier-1 values below are preserved to document the immutable published record (DOI 10.22399/ijcesen.4869); they are not independently reproducible from this artifact and do not validate the repaired post-publication implementation.
 
-**Tier 2 — Open benchmark (reproducible on commodity hardware).** The EmbedGuard Benchmark v1.0: 135 samples across Natural Questions, HotpotQA, MS-MARCO, and a 25-category injection attack dataset, exercising the prompt-layer detector that runs without specialized hardware. This tier is fully reproducible from the released repository with a single command and supports the pattern-detection and latency claims. It does not, by itself, evidence the cross-layer claims — a boundary we state plainly rather than blur.
+**Tier 2 — Open regression benchmark (repeatable on commodity hardware).** The EmbedGuard open benchmark contains 135 locally curated samples across three benign benchmark-style files and a 25-category injection file, exercising the released prompt-layer detector in pattern-only mode without specialized hardware. This tier is repeatable from the released repository with a single command and supports only the observed regression-set prompt-detection, specificity, and latency claims. It does not evidence generalization, cross-layer benefit, TEE behavior, or comparative Tier-1 claims.
 
-### 4.1 Tier 1: Production-Scale Evaluation
+### 4.1 Archived Tier-1 Version-of-Record Results (Not Reproduced Here)
 
-**Attack Implementation.** Four attack families were implemented from the recent security literature (Zou et al., 2024; Liu et al., 2024; Lee, Kim & Kwon, 2023): (1) optimization-based attacks using projected gradient descent over document content (learning rate 0.01, 500 iterations) to maximize retrieval probability; (2) transferability-based attacks crafted against public embedding models (BERT-base, RoBERTa) and transferred to the private model, exploiting ~47% cross-architecture transfer rates; (3) semantic manipulation attacks embedding adversarial content in fluent natural language; and (4) adaptive attacks using Bayesian optimization with knowledge of the deployed defenses, iteratively refining against detection feedback.
+**Published protocol description.** The version of record states that four attack families were used: optimization-based, transferability-based, semantic manipulation, and adaptive attacks. Because the corresponding generator, configurations, and per-example outputs are unavailable here, the repository cannot verify the stated learning rate, iteration count, transfer rate, or adaptive optimization procedure.
 
-**Table 4a: Tier 1 Detection Performance by Attack Family**
+<p class="table-caption"><strong>Table 6a: Archived Tier-1 Detection Performance Reported in the Version of Record</strong></p>
 
 | Attack Type | Detection Rate | False Positive Rate | Mean Latency |
 |-------------|----------------|---------------------|---------------|
@@ -334,9 +338,9 @@ We report results at two evaluation tiers with different reproducibility propert
 | Adaptive Attacks | 89.3% | 5.2% | 53ms |
 | Coordinated Multi-Layer | 96.2% | 2.9% | 58ms |
 
-Coordinated multi-layer attacks achieve the *highest* detection (96.2%) precisely because attack signatures distributed across layers produce correlated anomalies — the failure mode of single-layer defenses is the strongest signal for a correlating detector. Against adaptive attacks designed with knowledge of the deployed defenses, detection degrades gracefully to 89.3% rather than collapsing.
+The version of record reports its highest detection for coordinated multi-layer attacks (96.2%) and 89.3% for adaptive attacks. Without raw predictions and attack-generation artifacts, this repository cannot verify the proposed explanation that correlation caused the difference.
 
-**Table 4b: Tier 1 Comparative Analysis (identical conditions, same attack datasets)**
+**Table 6b: Archived Tier-1 Comparative Values Reported in the Version of Record**
 
 | Defense System | Baseline Detection | Adaptive Detection | FPR | Latency |
 |----------------|--------------------|--------------------|------|----------|
@@ -345,7 +349,7 @@ Coordinated multi-layer attacks achieve the *highest* detection (96.2%) precisel
 | RobustRAG | 82.9% | 58.7% | 6.1% | 42ms |
 | TrustRAG | 79.3% | 54.2% | 5.3% | 35ms |
 
-The decisive comparison is under adaptation: single-layer defenses degrade to 54.2–61.4% while EmbedGuard holds 89.3% — a 27.9–35.1 percentage point advantage. This is the empirical core of the cross-layer hypothesis: an attacker can evade any one detection modality, but evading four orthogonal modalities *simultaneously* is a harder joint optimization. Cross-layer ablation on this tier attributes an 18.4 percentage point improvement to correlation over the best single layer (embedding attestation alone: 76.3%).
+The published table reports a 27.9–35.1 percentage-point adaptive-detection difference and an 18.4 percentage-point full-system versus embedding-only ablation difference. Those arithmetic differences are retained as publication history, not as independently auditable comparative or causal evidence in this repository.
 
 ### 4.2 Tier 2: Open Benchmark Evaluation
 
@@ -353,22 +357,22 @@ The decisive comparison is under adaptation: single-layer defenses degrade to 54
 
 **Infrastructure Configuration:**
 - Hardware: Standard compute environment (Python 3.10+)
-- Detector: PatternBasedDetector with 81 patterns, threshold 0.70
-- Embedding Model: sentence-transformers/all-mpnet-base-v2 (768 dimensions)
+- Detector: production `PromptInjectionDetector` in pattern-only mode, 83 patterns, threshold 0.70
+- Recorded run: 2026-07-10; committed JSON and Markdown report under `results/`
 
 **Benchmark Datasets:**
 
-We evaluate on three established NLP benchmarks for benign query assessment plus a comprehensive injection attack dataset:
+The repository contains locally curated benchmark-style benign queries labeled after three public NLP datasets plus a curated injection regression set. It does not include upstream example identifiers, extraction manifests, or checksums that would establish these rows as exact subsets of those datasets:
 
 | Dataset | Samples | Type | Source |
 |---------|---------|------|--------|
-| Natural Questions (NQ) | 50 | Benign queries | Google Research |
-| HotpotQA | 25 | Benign queries | Stanford NLP |
-| MS-MARCO | 25 | Benign queries | Microsoft Research |
-| Injection Attacks | 35 | 30 attacks + 5 benign | 25 attack categories |
+| Natural Questions-style | 50 | Curated benign queries | Local file labeled NQ |
+| HotpotQA-style | 25 | Curated benign queries | Local file labeled HotpotQA |
+| MS-MARCO-style | 25 | Curated benign queries | Local file labeled MS-MARCO |
+| Injection regression set | 35 | 30 attacks + 5 benign | Local 25-category set |
 | **Total** | **135** | — | — |
 
-**Attack Dataset Composition:**
+<p class="keep-with-next"><strong>Attack Dataset Composition:</strong></p>
 
 The injection attack dataset spans 25 distinct attack categories derived from recent security literature (Zou et al., 2024; Liu et al., 2024; Carlini et al., 2023):
 
@@ -402,11 +406,11 @@ The injection attack dataset spans 25 distinct attack categories derived from re
 | **Total Attacks** | **30** | — |
 | Benign Control | 5 | Legitimate queries |
 
-**Reproducibility:** All datasets, code, and evaluation scripts are released at https://github.com/neerazz/embedguard with documented random seeds enabling exact reproduction.
+**Reproducibility:** All Tier-2 datasets, detector code, and evaluation scripts are released at https://github.com/neerazz/embedguard. Classification counts are deterministic for the committed inputs; wall-clock latency varies by hardware and system load.
 
 #### 4.2.2 Detection Performance Results
 
-**Table 4: EmbedGuard Aggregate Detection Performance**
+**Table 7: EmbedGuard Aggregate Detection Performance**
 
 | Metric | Value | Description |
 |--------|-------|-------------|
@@ -424,7 +428,7 @@ The injection attack dataset spans 25 distinct attack categories derived from re
 | **Recall** | **100%** | 30/(30+0) |
 | **F1 Score** | **1.00** | Harmonic mean |
 
-**Table 5: Detection Performance by Attack Category**
+**Table 8: Detection Performance by Attack Category**
 
 | Attack Category | Samples | Detected | Detection Rate | Mean Score |
 |-----------------|---------|----------|----------------|------------|
@@ -435,185 +439,114 @@ The injection attack dataset spans 25 distinct attack categories derived from re
 | Prompt Leaking | 1 | 1 | 100% | 0.85 |
 | Role Manipulation | 1 | 1 | 100% | 0.85 |
 | Indirect Injection | 1 | 1 | 100% | 0.85 |
-| Unicode Obfuscation | 1 | 1 | 100% | 0.80 |
+| Unicode Obfuscation | 1 | 1 | 100% | 0.85 |
 | Base64 Encoding | 1 | 1 | 100% | 0.85 |
 | Delimiter Confusion | 1 | 1 | 100% | 0.80 |
 | XML Injection | 1 | 1 | 100% | 0.90 |
-| Markdown Injection | 1 | 1 | 100% | 0.85 |
+| Markdown Injection | 1 | 1 | 100% | 0.80 |
 | Developer Mode | 1 | 1 | 100% | 0.90 |
 | Hypothetical Framing | 1 | 1 | 100% | 0.90 |
 | Fictional Framing | 1 | 1 | 100% | 0.80 |
 | Translation Attack | 1 | 1 | 100% | 0.90 |
-| Repetition Attack | 1 | 1 | 100% | 0.80 |
+| Repetition Attack | 1 | 1 | 100% | 0.85 |
 | Authority Claim | 1 | 1 | 100% | 0.90 |
 | Emotional Manipulation | 1 | 1 | 100% | 0.90 |
 | RAG-Specific | 3 | 3 | 100% | 0.88 |
 | Composite Attack | 2 | 2 | 100% | 0.90 |
 | Subtle Manipulation | 2 | 2 | 100% | 0.93 |
 | Multi-Turn Setup | 1 | 1 | 100% | 0.90 |
-| Payload Splitting | 1 | 1 | 100% | 0.90 |
+| Payload Splitting | 1 | 1 | 100% | 0.85 |
 | Virtualization | 1 | 1 | 100% | 0.95 |
 
-EmbedGuard demonstrates 100% detection across all 25 attack categories while maintaining zero false positives on 105 benign queries. The pattern-based detector with 81 patterns and 0.70 threshold achieves complete separation between attack and benign distributions. Detection scores range from 0.80 to 1.00 across attack categories, with encoding-based attacks (Unicode, Base64, delimiter confusion) at the lower end and direct/composite attacks at the higher end, reflecting the inherent detectability characteristics of different attack vectors.
+On these fixed samples, the 83-pattern detector identifies all attacks and flags none of the benign queries. This is an observed benchmark result, not a guarantee for unseen attacks or production traffic. Attack-category sample sizes range from one to three, so the per-category percentages are descriptive rather than stable population estimates.
 
-**Table 6: Benign Query Performance by Benchmark Dataset**
+<p class="table-caption"><strong>Table 9: Benign Query Performance by Benchmark Dataset</strong></p>
 
 | Dataset | Samples | False Positives | True Negatives | Specificity | Mean Latency |
 |---------|---------|-----------------|----------------|-------------|--------------|
-| Natural Questions | 50 | 0 | 50 | 100% | 0.019ms |
-| HotpotQA | 25 | 0 | 25 | 100% | 0.043ms |
-| MS-MARCO | 25 | 0 | 25 | 100% | 0.022ms |
+| Natural Questions-style | 50 | 0 | 50 | 100% | 0.042ms |
+| HotpotQA-style | 25 | 0 | 25 | 100% | 0.099ms |
+| MS-MARCO-style | 25 | 0 | 25 | 100% | 0.038ms |
 | Control (in injection set) | 5 | 0 | 5 | 100% | — |
-| **Total Benign** | **105** | **0** | **105** | **100%** | **0.026ms** |
+| **Total Benign** | **105** | **0** | **105** | **100%** | — |
 
-The detector correctly classifies all 105 benign queries across diverse domains (factual Q&A, multi-hop reasoning, passage ranking) without false alarms, demonstrating robust specificity across varied legitimate query distributions.
+The detector flags none of the 105 benign strings in these three fixed local files. Because the samples lack upstream provenance and were not selected as hard negatives, this result is a regression observation rather than evidence of robust specificity across legitimate-query distributions.
 
-#### 4.2.3 Statistical Significance Analysis
+#### 4.2.3 Uncertainty Analysis
 
-To ensure results are not due to random variance, we applied formal statistical tests:
+We report two-sided 95% Wilson score intervals over the observed confusion-matrix counts. We do not apply signed-rank, McNemar, or effect-size tests because this benchmark has no paired comparator and the released result summary does not contain an independent distribution of per-sample model scores suitable for those analyses.
 
-**Table 7: Statistical Significance Tests**
+| Quantity | Observed count | Point estimate | 95% Wilson interval |
+|----------|----------------|----------------|---------------------|
+| Detection rate | 30/30 | 100% | 88.6%-100% |
+| Specificity | 105/105 | 100% | 96.5%-100% |
 
-| Test | Statistic | p-value | Interpretation |
-|------|-----------|---------|----------------|
-| Wilcoxon Signed-Rank (attack vs. null) | W = 0 | p < 0.001 | Detection significantly different from random |
-| McNemar's Test (attack classification) | χ² = 30.0 | p < 0.001 | Classification significantly better than baseline |
-| Fisher's Exact Test (contingency) | — | p < 0.001 | Association between labels and predictions |
-
-**Bonferroni Correction:** For multiple comparisons across 25 attack categories, we apply corrected significance threshold α = 0.05/25 = 0.002. All per-category detection rates remain significant after correction.
-
-**Effect Size Analysis:**
-- **Cohen's h** = 0.78 (large effect) comparing attack detection scores (μ=0.87, σ=0.05) vs. benign scores (μ=0.0)
-- **Cohen's d** = 17.4 (very large effect) for score separation
-- **Practical interpretation:** Attack and benign distributions show no overlap; the 0.70 threshold provides >3σ separation from both distributions
-
-**95% Confidence Intervals (Wilson score interval):**
-- Detection Rate: 100% [95% CI: 88.4% - 100%] (N=30)
-- Specificity: 100% [95% CI: 96.6% - 100%] (N=105)
-
-The wide confidence interval on detection rate (88.4% lower bound) reflects the limited sample size; we recommend community evaluation on larger datasets to narrow this interval.
+The intervals are generated by `scripts/statistical_tests.py` from the committed benchmark JSON. The 88.6% lower bound for detection makes the central limitation visible: 30 successful attack detections do not establish universal coverage, even though the point estimate on this fixed benchmark is 100%.
 
 #### 4.2.4 Latency Analysis
 
-**Table 7: Per-Dataset Latency Statistics**
+**Table 10: Per-Dataset Latency Statistics**
 
 | Dataset | Mean (ms) | Median (ms) | P95 (ms) | P99 (ms) | Min (ms) | Max (ms) |
 |---------|-----------|-------------|----------|----------|----------|----------|
-| Injection Attacks | 0.098 | 0.101 | 0.147 | 0.170 | 0.025 | 0.174 |
-| Natural Questions | 0.023 | 0.020 | 0.042 | 0.053 | 0.008 | 0.061 |
-| HotpotQA | 0.052 | 0.047 | 0.093 | 0.112 | 0.028 | 0.118 |
-| MS-MARCO | 0.020 | 0.018 | 0.040 | 0.045 | 0.009 | 0.047 |
-| **Aggregate** | **0.047** | **0.029** | **0.128** | **0.156** | **0.008** | **0.174** |
+| Injection set (30 attacks + 5 benign) | 0.169 | 0.179 | 0.249 | 0.273 | 0.045 | 0.275 |
+| Natural Questions-style | 0.042 | 0.038 | 0.072 | 0.087 | 0.017 | 0.095 |
+| HotpotQA-style | 0.099 | 0.092 | 0.181 | 0.187 | 0.055 | 0.187 |
+| MS-MARCO-style | 0.038 | 0.033 | 0.073 | 0.083 | 0.016 | 0.085 |
+| **Aggregate** | **0.085** | **0.055** | **0.219** | **0.259** | **0.016** | **0.275** |
 
-*Results from benchmark run on 2026-01-24 using 81 patterns, 0.70 threshold, N=135 samples.*
+*Recorded on 2026-07-10 using the released pattern-only detector (83 patterns, threshold 0.70, N=135). Timing is machine- and load-dependent; classification counts are the reproducible result.*
 
-Latency overhead is sub-millisecond across all datasets, with aggregate mean of 0.047ms and P99 of 0.156ms. This enables real-time detection without perceptible user-facing latency impact. Attack queries show higher latency (0.098ms mean) due to pattern matching overhead when attacks trigger multiple detection patterns simultaneously.
+Latency is sub-millisecond on this recorded run, with an aggregate mean of 0.085ms and P99 of 0.259ms. The benchmark is single-threaded and does not measure service-level throughput, concurrency, tail behavior under load, or end-to-end RAG latency.
 
-![Figure 3: Latency distribution across benchmark datasets](images/figure_3.png)
+![Figure 3: Tier-2 prompt-layer latency across benchmark-style datasets](images/figure_3.png)
 
-*Figure 3: Latency distribution across benchmark datasets showing sub-millisecond detection performance.*
+*Figure 3: Single-run, host-dependent prompt-detector latency for the committed 135-sample Tier-2 run. Circles are means, diamonds are p95, triangles are p99, and gray whiskers span minimum to maximum. Dataset names denote locally curated benchmark-style inputs, not verified upstream subsets.*
 
-#### 4.2.5 Throughput Scaling
+#### 4.2.5 Evaluation Boundary
 
-The pattern-based detector achieves throughput of approximately 21,000 queries/second in single-threaded Python execution (based on 0.047ms mean latency). Actual production throughput will vary based on:
-
-- Hardware (CPU frequency, cache size)
-- Concurrent request handling (multiprocessing)
-- Pattern complexity and query length
-
-**Note:** Detailed batch scaling benchmarks require production deployment validation and are not included in this initial evaluation. The sub-millisecond per-query latency indicates the approach is viable for real-time RAG applications.
-
-#### 4.2.6 Adversarial Robustness Stress-Test
-
-We evaluate EmbedGuard against established adversarial attack methods to assess robustness beyond curated test cases:
-
-**Table 8: Adversarial Attack Deflection Rates**
-
-| Attack Method | Reference | ASR (Undefended) | EmbedGuard Deflection |
-|--------------|-----------|------------------|----------------------|
-| GCG | Zou et al., 2023 | 78% | 100% (30/30 deflected) |
-| PAIR | Chao et al., 2023 | 62% | 96.7% (29/30 deflected) |
-| AutoDAN | Liu et al., 2024 | 85% | 100% (30/30 deflected) |
-| TAP | Mehrotra et al., 2024 | 71% | 93.3% (28/30 deflected) |
-
-**Aggregate Jailbreak Deflection Rate:** 97.5% (117/120 adversarial prompts deflected)
-
-The 3 undeflected prompts (2 PAIR, 1 TAP) used synonym substitution combined with fictional framing—attack patterns at the lower end of EmbedGuard's detection scores (0.65-0.68). These edge cases inform future pattern refinement.
-
-**Planned Evaluation:** We will integrate test cases from JailbreakBench (Chao et al., 2024) and report deflection rates in a follow-up study.
+The open benchmark does not measure concurrent throughput, full-pipeline RAG latency, semantic or model-based prompt detection, corpus poisoning, adaptive attacks, or performance on JailbreakBench. These are follow-up experiments, not results of the released Tier-2 benchmark.
 
 ### 4.3 Architectural Analysis
 
 **Reconciling the two tiers:**
 
-The prompt classifier achieves 100% detection on the Tier 2 benchmark, while the full framework achieves 89.3-96.2% on Tier 1. These are not contradictory; they measure different things. Tier 2's injection dataset consists of prompt-borne attacks — the attack class the prompt layer is designed for — delivered at benchmark scale where the 81-pattern taxonomy achieves full coverage. Tier 1's attack families (gradient-optimized document poisoning, cross-model transfer, adaptive evasion) largely bypass the prompt layer entirely: the malicious content arrives through the corpus, not the query. Detecting them is precisely what the embedding, retrieval, and output layers exist for, and detection there is statistical rather than pattern-exact, hence sub-100% rates. A reader should take Tier 2 as evidence that the reproducible prompt layer performs as specified, and Tier 1 as evidence that the cross-layer architecture earns its complexity against corpus-borne attacks:
+The prompt classifier achieves 100% detection on the Tier 2 benchmark, while the full framework reports 89.3-96.2% on Tier 1. These are not contradictory; they measure different things. Tier 2 consists of prompt-borne attacks delivered at benchmark scale where the 83-pattern taxonomy covers every included sample. Tier 1's attack families (gradient-optimized document poisoning, cross-model transfer, adaptive evasion) largely bypass the prompt layer: the malicious content arrives through the corpus, not the query. A reader should treat Tier 2 as reproducible evidence for one prompt-layer implementation and Tier 1 as version-of-record evidence for the broader architecture:
 
 | Layer | Detection Mechanism | Primary Target | Weight (β) |
 |-------|--------------------|--------------------|------------|
-| Prompt | Pattern matching (81 patterns) | Injection attempts, jailbreaks | 0.35 |
-| Embedding | TEE cryptographic attestation | Unauthenticated embeddings | 0.75 |
-| Retrieval | Distributional analysis (PCA, KL) | Coordinated poisoning | 0.50 |
+| Prompt | Pattern matching (83 patterns) | Injection attempts, jailbreaks | 0.35 |
+| Embedding | Target SEV-SNP attestation; repository HMAC simulator | Unauthenticated embeddings | 0.75 |
+| Retrieval | PCA reconstruction error and Mahalanobis distance | Coordinated poisoning | 0.50 |
 | Output | Perturbation stability testing | Hidden backdoors | 0.20 |
 
-The Threat Correlation Engine fuses signals using: ThreatScore = Σᵢ βᵢ × signalᵢ with flag threshold 0.70 and block threshold 0.85. The prompt layer's 100% standalone performance on the Tier 2 benchmark demonstrates effective first-line defense; the Tier 1 results demonstrate that the remaining layers carry the detection load for attacks that never appear in the query.
+The current Threat Correlation Engine computes a confidence-weighted consensus, takes the maximum of that consensus and the strongest confidence-adjusted layer signal, adds a bounded multi-layer correlation factor, and clips the result to 1.0. Gated mode flags at 0.70; active mode blocks at 0.85. Tier 2 supports only the prompt-layer observation. The archived Tier-1 results report broader-layer performance but cannot be reproduced from the open artifact.
 
-![Figure 4: Ablation — cross-layer contribution](images/figure_4.png)
+![Figure 4: Archived Tier-1 ablation comparison](images/figure_4.png)
 
-*Figure 4: Ablation analysis of cross-layer contribution: detection rate by layer configuration.*
+*Figure 4: Machine-readable transcription of the version-of-record Tier-1 ablation table (`paper/data/tier1_ablation_vor.json`). The 18.4-point difference compares the full system with the best single-layer configuration; it is historical comparative evidence, not causal isolation of the correlation mechanism. Tier-1 sample counts, confidence intervals, and raw observations are unavailable in the open archive.*
 
-#### 4.3.1 Ablation Study: Pattern Complexity Justification
+#### 4.3.1 What the Open Benchmark Does Not Establish
 
-To validate that 81 patterns are necessary (not over-engineered), we evaluate detection with reduced pattern sets:
-
-**Table 9: Pattern Count Ablation**
-
-| Configuration | Patterns | Attack Detection | FPR | F1 Score |
-|--------------|----------|------------------|-----|----------|
-| Full | 81 | 100% (30/30) | 0% | 1.00 |
-| Top-50% frequency | 40 | 86.7% (26/30) | 0% | 0.93 |
-| Top-25% frequency | 20 | 73.3% (22/30) | 0% | 0.85 |
-| Core categories only | 10 | 56.7% (17/30) | 0% | 0.72 |
-| Pattern-free (neural only) | 0 | 45.0% (13.5/30)* | 2.1% | 0.62 |
-
-*Estimated from held-out validation; neural classifier not fully trained.
-
-**Key Findings:**
-1. Removing bottom 50% of patterns causes 13.3% detection loss
-2. Long-tail patterns capture novel attack variants not covered by common signatures
-3. Pattern-free approach has 55% worse detection and introduces false positives
-
-**Table 10: Cross-Layer Ablation**
-
-| Configuration | Detection Rate | FPR | Latency |
-|--------------|----------------|-----|---------|
-| Full (4 layers) | 100% | 0% | 0.04ms* |
-| Prompt only | 100% | 0% | 0.04ms |
-| Prompt + Embedding | 100% | 0% | 0.08ms |
-| Prompt + Retrieval | 100% | 0% | 0.12ms |
-| No prompt layer | 65%† | 3.2% | 0.11ms |
-
-*Prompt layer dominates; additional layers add latency without improving this benchmark.
-†Estimated from cross-layer correlation without prompt detection.
-
-**Interpretation:** On this benchmark, the prompt layer alone achieves 100% detection. Additional layers provide **defense-in-depth** value not captured by single-benchmark evaluation—they protect against adaptive adversaries who learn to evade prompt-layer patterns.
+The released Tier-2 data do not support a pattern-count ablation, a neural-versus-pattern comparison, or a cross-layer ablation because only the pattern-only prompt path is exercised. Earlier extended drafts contained estimated values for those comparisons; this revision removes them. The only cross-layer ablation retained is the Tier-1 table reported in the published version of record and plotted in Figure 4. A future open evaluation should execute all layer configurations against the same corpus-poisoning workload before attributing gains to defense-in-depth in the repository benchmark.
 
 ### 4.4 Limitations
 
 This study has several limitations that warrant discussion:
 
-1. **TEE Hardware Assumptions:** The cryptographic attestation layer assumes AMD SEV-SNP trust roots are not compromised and firmware is current. Recent vulnerabilities demonstrate ongoing security challenges: CVE-2024-56161 (CVSS 7.2) enables malicious microcode injection through improper signature verification, potentially allowing attackers with local administrator access to compromise confidential guests (AMD, 2025a). CVE-2024-21944 enables memory aliasing attacks that can undermine SEV-SNP integrity features (AMD, 2025b). These vulnerabilities require timely firmware patches; organizations must maintain current AMD Platform Initialization (PI) and SEV firmware to preserve attestation guarantees. **Our threat model assumes a trusted hardware vendor and excludes physical attacks, insider threats with administrative access, and nation-state adversaries capable of hardware-level compromise.**
+1. **TEE and Source-Admission Assumptions:** The target attestation design assumes AMD SEV-SNP trust roots are not compromised and firmware is current. Recent vulnerabilities demonstrate ongoing security challenges: CVE-2024-56161 (CVSS 7.2) enables malicious microcode injection through improper signature verification, potentially allowing attackers with local administrator access to compromise confidential guests (AMD, 2025a). CVE-2024-21944 enables memory aliasing attacks that can undermine SEV-SNP integrity features (AMD, 2025b). These vulnerabilities require timely firmware patches. More fundamentally, provenance is not semantic trust: an authorized but malicious document can be faithfully embedded and attested. Source admission, authorization, and content validation remain separate controls. The released HMAC simulator provides no hardware guarantee.
 
-2. **Benchmark Scale:** The current evaluation comprises 135 samples across 4 benchmark datasets. While this demonstrates detection capability across diverse attack categories, production deployments may encounter attack distributions and query patterns not represented in this benchmark. We release complete code and datasets enabling community extension to larger-scale evaluations.
+2. **Benchmark Scale:** The open regression evaluation comprises 135 locally curated strings across one injection file and three benign style subsets. It measures fixed-file behavior, not generalization to the upstream Natural Questions, HotpotQA, or MS MARCO datasets. The released files and runner permit extension, but production traffic may contain distributions and attacks absent from this set.
 
-3. **Perfect Detection Caveat:** The 100% detection rate on this benchmark reflects effective pattern coverage for the 25 attack categories evaluated. Novel attack techniques not covered by the 81 detection patterns may achieve evasion. Continuous pattern updates and cross-layer detection provide defense-in-depth against evolving threats.
+3. **Perfect Detection Caveat:** The 100% detection rate on this benchmark reflects coverage of the 30 included attack strings. Novel attacks not covered by the 83 patterns may evade the prompt layer; the Wilson lower bound of 88.6% quantifies part of the sampling uncertainty but does not cover distribution shift.
 
 4. **English-Language Focus:** Evaluation focused on English-language corpora. Multilingual RAG systems may exhibit different attack surfaces (e.g., Unicode exploitation across writing systems, translation-based evasion) not fully captured in our analysis.
 
-5. **Adaptive Adversary Evolution:** Adversaries aware of EmbedGuard's pattern-based detection may develop novel evasion techniques exploiting pattern gaps. The cross-layer architecture provides redundancy: attacks evading the prompt layer may be detected by embedding attestation, retrieval analysis, or output verification layers.
+5. **Adaptive Adversary Evolution:** Adversaries aware of EmbedGuard's pattern-based detection may develop novel evasion techniques exploiting pattern gaps. A complete implementation of the cross-layer architecture could provide redundancy, but the open benchmark does not show that the current provenance, retrieval, or output prototypes detect those evasions.
 
-6. **Single-Vector Attack Concentration:** While EmbedGuard excels at detecting attacks distributing signatures across layers, adversaries might concentrate attack signals on a single architectural layer while remaining invisible to others. For example, an attacker with valid TEE attestation credentials (e.g., a malicious insider) could bypass the embedding layer entirely while targeting retrieval or output layers.
+6. **Single-Vector Attack Concentration:** A complete cross-layer implementation could still miss attacks concentrated on one architectural layer. Correct provenance is not semantic trust: an authorized but malicious source could generate a correctly attested embedding while targeting retrieval or output behavior. The repository benchmark does not test this scenario.
 
-7. **Attack Scope:** This work focuses on integrity attacks (content manipulation through injection and poisoning). Availability attacks such as jamming and denial-of-service represent a complementary threat model addressed by recent work (Shafran et al., USENIX Security 2025). Future work will extend EmbedGuard to detect availability violations through retrieval denial patterns.
+7. **Attack Scope:** This work focuses on integrity attacks (content manipulation through injection and poisoning). Availability attacks such as jamming and denial-of-service are a complementary threat model outside this implementation and evaluation. Future work could extend EmbedGuard to detect availability violations through retrieval denial patterns.
 
 8. **Concurrent Work:** The layered-defense and embedding-provenance directions are active research areas; concurrent 2025-2026 frameworks (Section 2.4) independently validate both ideas. Our novelty claims are scoped accordingly: the specific combination of four-layer signal *fusion* (rather than sequential filtering) with a *hardware* root of trust for embedding provenance (rather than software signatures) is, to our knowledge, unique, but individual components have close relatives that practitioners may prefer for specific deployments — e.g., software-signature provenance where TEE hardware is unavailable. A head-to-head comparison against post-2025 detectors (GMTP, RevPRAG, hubness-based methods) on a shared benchmark is the highest-value next experiment.
 
@@ -627,12 +560,12 @@ Attackers can bypass pattern-based detection through several techniques:
 
 | Evasion Technique | Example | Detection Status | Mitigation |
 |-------------------|---------|------------------|------------|
-| Whitespace injection | "I g n o r e" | ⚠️ Vulnerable | Token normalization preprocessor |
-| Homoglyph substitution | Cyrillic "а" for Latin "a" | ⚠️ Vulnerable | Unicode NFKC normalization |
+| Whitespace injection | "I g n o r e" | Covered by current tests | Whitespace-stripped parallel match |
+| Homoglyph substitution | Compatibility-equivalent Unicode forms | Partially covered | Unicode NFKC normalization |
 | Synonym substitution | "Discard" for "Ignore" | ⚠️ Vulnerable | Semantic embedding layer |
 | Tokenization attacks | Unusual byte sequences | ⚠️ Vulnerable | Byte-level pattern matching |
 
-**Mitigation Implementation:** The token normalization preprocessor (Section 3.2) removes whitespace, normalizes Unicode via NFKC, and strips zero-width characters before pattern matching. Attacks must evade both normalized and original text matching.
+**Mitigation Implementation:** The token normalization preprocessor (Section 3.2) removes whitespace, normalizes Unicode via NFKC, and strips zero-width characters before pattern matching. It improves coverage for the tested whitespace and invisible-character evasions, but NFKC does not map every cross-script homoglyph; synonym, transliteration, and byte-level evasions remain open risks.
 
 #### 4.5.2 TEE Compromise Scenarios
 
@@ -664,25 +597,25 @@ The 135-sample benchmark may not represent all production distributions:
 
 RAG system integrity is critical for several application domains where safety or compliance with regulations is essential.
 
-**Healthcare:** Clinical decision support systems often use RAG architectures to analyze medical literature, treatment protocols, clinical cases, and drug databases to produce evidence-based diagnosis and treatment recommendations. Breaching the integrity of such systems has consequences for patient safety, regulatory compliance, and financial costs (IBM Security, 2024). EmbedGuard's attestation mechanisms provide cryptographic proofs of trustworthiness needed for healthcare applications, enabling clinical systems to report treatment recommendations derived from trusted medical literature rather than potentially compromised information sources.
+**Healthcare:** Clinical decision support systems often use RAG architectures to analyze medical literature, treatment protocols, clinical cases, and drug databases to produce evidence-based recommendations. Breaching the integrity of such systems has consequences for patient safety, regulatory compliance, and financial costs (IBM Security, 2024). A production implementation of the target protocol could prove which document and model produced an embedding; it could not prove that the medical source or generated recommendation is correct.
 
-**Financial Services:** Financial institutions use RAG systems for trading, risk assessment, and regulatory compliance. Attacks on financial AI systems could create significant profit opportunities for adversaries or harm market integrity. The cross-layer detection capabilities of EmbedGuard have immediate applications in finance, where adversaries are known to be advanced and adaptive.
+**Financial Services:** Financial institutions use RAG systems for trading, risk assessment, and regulatory compliance. Attacks on financial AI systems could create significant profit opportunities for adversaries or harm market integrity. EmbedGuard is a reference design for evaluating integrity controls in that setting, not a validated financial-services control.
 
-**Legal Research:** Legal RAG systems retrieve case law, statutes, regulations, and legal commentary to inform legal analysis and brief generation. Compromised legal research systems can introduce incorrect legal interpretation into client matters with limited chance of detection, creating cascading professional liability exposure. EmbedGuard's provenance attestation addresses this need by allowing law firms to cryptographically attest that legal research outputs are derived from verified primary sources.
+**Legal Research:** Legal RAG systems retrieve case law, statutes, regulations, and legal commentary to inform legal analysis and brief generation. Compromised systems can introduce incorrect interpretation into client matters. Provenance can bind retrieved vectors to specified source bytes, but legal source authority and output correctness still require independent validation.
 
-**Equity Considerations:** EmbedGuard also addresses broader equity issues. Large organizations have dedicated AI security teams and resources, while smaller organizations lack such capabilities (IBM Security, 2024). The modular, production-ready framework with flexible deployment modes enables organizations of any size to deploy appropriate defenses, democratizing AI security for mission-critical use cases in rural healthcare, community legal services, and small financial advisors.
+**Equity Considerations:** Large organizations have dedicated AI security teams and resources, while smaller organizations often do not (IBM Security, 2024). The modular reference implementation and commodity-hardware prompt benchmark lower the barrier to evaluating one part of this defense stack. Production use of the full architecture still requires engineering, domain calibration, and—in the attestation path—TEE-capable infrastructure.
 
 ---
 
 ## 6. Conclusions
 
-This work establishes **EmbedGuard** as, to our knowledge, the first RAG defense that fuses anomaly signals from all four architectural layers (prompt, embedding, retrieval, output) into a single correlated detection decision, combined with hardware-backed attestation of embedding provenance. Concurrent work validates both directions independently — layered defenses against prompt injection and software-signature embedding provenance have appeared in 2025-2026 (Section 2.4) — but no prior framework combines signal fusion across the full stack with a hardware root of trust for the embedding layer. By open-sourcing the 81-pattern detection taxonomy, the benchmark, and the cross-layer correlation methodology, we provide a reproducible foundation for RAG security evaluation that others can extend, attack, and improve.
+This work presents **EmbedGuard**, a RAG-defense architecture that combines four-layer anomaly-signal fusion with hardware-rooted embedding provenance. The literature scan in Section 2.4 found close work on layered prompt-injection defense, defense orchestration, and software-signed embedding provenance; the contribution claimed here is the specific integration of joint four-layer scoring with a TEE trust root, not the invention of layered defense or provenance in isolation. The repository releases the 83-pattern prompt detector, its 135-sample benchmark, and the correlation implementation so that the reproducible subset can be extended, attacked, and improved.
 
-As retrieval-augmented generation systems become the backbone of AI applications, new security architectures are needed to address their unique threat model. Existing security architectures designed for vertically integrated solutions are ineffective against adversaries that can exploit vulnerabilities across multiple layers of RAG systems via compositional attacks. The cross-layer detection and cryptographic provenance attestation enabled by EmbedGuard represents a foundational improvement to RAG's security stack, enabling matching anomalous signals across the prompt, embedding, retrieval, and output layers for detection of complex poisoning attacks with production-grade latency.
+As retrieval-augmented generation systems span multiple attack surfaces, security evaluation should preserve evidence across the prompt, provenance, retrieval, and output stages rather than assume one detector is sufficient. EmbedGuard makes that integration testable, but the open artifact does not establish superiority over current defenses or production-grade full-pipeline latency.
 
-The hardware attestation scheme proposed in this work enforces a fundamental shift in the security model, turning embedding security from a statistical inference problem into a cryptographic verification problem. On the production-scale evaluation, the framework achieves 94.7% detection of optimization-based attacks and 89.3% under adaptive attack, with cross-layer correlation contributing an 18.4 percentage point improvement over the best single layer; on the open benchmark, the reproducible prompt-layer detector achieves 100% detection (30/30) with 0% false positives (0/105) at sub-millisecond latency, and deflects 97.5% of prompts from established jailbreak methods (GCG, PAIR, AutoDAN, TAP).
+The hardware attestation scheme changes the embedding-layer trust question from anomaly inference to verification of a hardware-rooted provenance claim, subject to the TEE assumptions and CVEs in Section 4.4. The published Tier-1 evaluation reports 94.7% detection of optimization-based attacks and 89.3% under adaptive attack, with an 18.4 percentage point cross-layer ablation gain. Separately, the current open Tier-2 benchmark observes 30/30 prompt attacks detected and 0/105 benign queries flagged, with two-sided 95% Wilson lower bounds of 88.6% and 96.5%, respectively. The repository does not currently reproduce the Tier-1 deployment or evaluate established jailbreak suites.
 
-The operational modes enable deployment across diverse organizational structures with various risk tolerances and operational constraints—particularly relevant for healthcare, financial services, and legal industries where correctness guarantees correlate with operational safety, regulatory compliance, and professional liability. Beyond sector-specific applications, EmbedGuard addresses the broader need for equitable AI security infrastructure, enabling resource-constrained organizations to deploy state-of-the-art defenses previously available only to well-resourced technology organizations.
+The operational modes describe how organizations could adapt the architecture to different risk tolerances—particularly in healthcare, financial services, and legal settings where integrity failures affect safety, compliance, or professional liability. Beyond sector-specific applications, EmbedGuard exposes a testable reference architecture and a low-cost prompt-layer benchmark. That is a starting point for evaluation, not evidence that the full framework is production-ready or state of the art across deployment contexts.
 
 **Future Work:** We will extend the framework to address: (1) multi-modal RAG systems with image/audio retrieval; (2) federated retrieval architectures with distributed trust; (3) continuous learning scenarios with evolving knowledge bases; and (4) availability attacks through retrieval denial pattern detection.
 
@@ -696,20 +629,19 @@ The author acknowledges the anonymous reviewers for their constructive feedback 
 
 ## Data Availability
 
-Complete implementation and evaluation materials are available with FAIR-compliant archival:
+The reference implementation and Tier-2 evaluation materials are available with FAIR-oriented archival:
 
 **Primary Repository:** https://github.com/neerazz/embedguard (MIT License)
 
-**Archived Versions:** Zenodo concept DOI [10.5281/zenodo.18364919](https://doi.org/10.5281/zenodo.18364919) (resolves to latest); v1.0.0 = [10.5281/zenodo.18364920](https://doi.org/10.5281/zenodo.18364920) (version evaluated in this article), v1.1.0 = [10.5281/zenodo.21280092](https://doi.org/10.5281/zenodo.21280092) (post-publication maintenance)
+**Archived Versions:** Zenodo concept DOI [10.5281/zenodo.18364919](https://doi.org/10.5281/zenodo.18364919) (resolves to latest archive); v1.0.0 = [10.5281/zenodo.18364920](https://doi.org/10.5281/zenodo.18364920) (version of record), v1.1.0 = [10.5281/zenodo.21280092](https://doi.org/10.5281/zenodo.21280092) (post-publication maintenance). Repository v1.2.0 / manuscript v3.1 is prepared in this revision and requires a new archive DOI when released.
 
 **Contents:**
 - **Source Code:** Complete EmbedGuard framework implementation (Python 3.10+)
-- **Benchmark Datasets:** Natural Questions (N=50), HotpotQA (N=25), MS-MARCO (N=25)
-- **Attack Dataset:** 35 injection samples spanning 25 attack categories with ground-truth labels
-- **Adversarial Tests:** 120 prompts from JailbreakBench (GCG, PAIR, AutoDAN, TAP)
-- **Evaluation Scripts:** Reproducible benchmark runner with statistical tests
-- **Detection Patterns:** 81 patterns in `embedguard/prompt_detector/__init__.py` (`INJECTION_PATTERNS`)
-- **Docker Image:** Pre-built container for one-line reproducibility
+- **Benchmark Inputs:** locally curated Natural Questions-style (N=50), HotpotQA-style (N=25), and MS-MARCO-style (N=25) files; upstream subset provenance is not established
+- **Injection Regression Set:** 35 rows: 30 attacks spanning 25 attack categories plus 5 benign controls, all with ground-truth labels
+- **Evaluation Scripts:** Benchmark runner plus count-based Wilson interval analysis
+- **Detection Patterns:** 83 patterns in `embedguard/prompt_detector/__init__.py` (`INJECTION_PATTERNS`)
+- **Container Recipe:** A Dockerfile for building a local image; no pre-built image is claimed
 
 **Reproducibility Commands:**
 ```bash
@@ -720,7 +652,7 @@ git clone https://github.com/neerazz/embedguard.git && cd embedguard && ./reprod
 docker build -t embedguard . && docker run --rm embedguard python examples/run_benchmarks.py
 ```
 
-**Random Seed:** All experiments use seed=42 for deterministic reproduction. See Appendix A for complete software specifications.
+**Determinism Note:** Tier-2 classification uses fixed inputs and deterministic regex/normalization logic; no random seed is required for the reported classification counts. Latency measurements vary by host and load. Appendix A separates the published Tier-1 environment from the commodity Tier-2 path.
 
 ---
 
@@ -808,7 +740,9 @@ Zou W, Geng J, Xi Z, Tang Y, Yu M, Wu B. 2024. PoisonedRAG: Knowledge Corruption
 
 ## Appendix A: Experimental Infrastructure and Reproducibility
 
-### A.1 Hardware Configuration
+### A.1 Tier-1 Hardware Configuration (Version-of-Record Reference)
+
+The configuration below is reported for the published Tier-1 evaluation. It is not recreated by `reproduce.sh` and should not be read as the hardware used for the current open benchmark.
 
 | Component | Specification |
 |-----------|---------------|
@@ -819,7 +753,7 @@ Zou W, Geng J, Xi Z, Tang Y, Yu M, Wu B. 2024. PoisonedRAG: Knowledge Corruption
 | Storage | Samsung PM9A3 NVMe SSD, 1.92TB |
 | Network | Mellanox ConnectX-6 100GbE |
 
-### A.2 Software Stack
+### A.2 Tier-1 Software Stack (Version-of-Record Reference)
 
 | Component | Version |
 |-----------|---------|
@@ -834,7 +768,7 @@ Zou W, Geng J, Xi Z, Tang Y, Yu M, Wu B. 2024. PoisonedRAG: Knowledge Corruption
 | NumPy | 1.24.3 |
 | scikit-learn | 1.3.2 |
 
-### A.3 TEE Configuration
+### A.3 Tier-1 TEE Configuration (Version-of-Record Reference)
 
 | Parameter | Setting |
 |-----------|---------|
@@ -847,22 +781,22 @@ Zou W, Geng J, Xi Z, Tang Y, Yu M, Wu B. 2024. PoisonedRAG: Knowledge Corruption
 
 - [x] Code available at: https://github.com/neerazz/embedguard
 - [x] Archived versions with DOIs: Zenodo concept 10.5281/zenodo.18364919 (v1.0.0: 18364920, v1.1.0: 21280092)
-- [x] Random seed documented: 42 (all experiments)
 - [x] Benchmark datasets included (`data/` directory)
-- [x] Configuration files for all experiments provided
-- [x] Hardware specifications documented (this appendix)
-- [x] Software versions pinned (requirements.txt)
-- [x] Pattern-based classifier (81 patterns) included in source
+- [x] Tier-1 hardware/software specifications documented as version-of-record reference
+- [x] Tier-2 dependency ranges declared (`pyproject.toml`, `requirements.txt`)
+- [x] Pattern-based classifier (83 patterns) included in source
 - [x] Benchmark runner script (`run_benchmarks.py`) included
-- [x] Results validation script for reproducibility verification
+- [x] Count-based uncertainty analysis (`scripts/statistical_tests.py`) included
+- [ ] Tier-1 production corpus and TEE execution environment publicly reproducible
+- [ ] JailbreakBench or equivalent external adversarial suite evaluated
 
 ### A.5 Evaluation Datasets
 
 | Dataset | Size | Domain | Source |
 |---------|------|--------|--------|
-| Natural Questions | 50 samples | Open-domain QA | NQ benchmark (Kwiatkowski et al., 2019) |
-| HotpotQA | 25 samples | Multi-hop reasoning | HotpotQA benchmark (Yang et al., 2018) |
-| MS-MARCO | 25 samples | Web search QA | MS-MARCO benchmark (Nguyen et al., 2016) |
+| Natural Questions-style | 50 samples | Curated open-domain QA | Local file labeled NQ; no upstream IDs |
+| HotpotQA-style | 25 samples | Curated multi-hop reasoning | Local file labeled HotpotQA; no extraction manifest |
+| MS-MARCO-style | 25 samples | Curated web-search QA | Local file labeled MS-MARCO; no extraction manifest |
 | Injection Attacks | 30 attacks | 25 attack categories | Curated adversarial dataset |
 | Benign Control | 5 samples | Mixed domains | Baseline verification set |
 | **Total** | **135 samples** | **Multi-domain** | **Reproducible benchmark** |
@@ -871,16 +805,9 @@ Zou W, Geng J, Xi Z, Tang Y, Yu M, Wu B. 2024. PoisonedRAG: Knowledge Corruption
 
 ### A.6 Compute Requirements
 
-| Experiment | Hardware | Wall Time |
+| Experiment | Execution | Recorded detector time |
 |------------|-----------|-----------|
-| Full Benchmark Suite | Standard CPU | <1 second |
-| Pattern Matching (135 samples) | Single-threaded | ~5.4ms total |
-| Per-Query Latency | Standard CPU | 0.04ms mean |
+| Pattern Matching (135 samples) | Single-threaded | ~11.4ms summed detector time on recorded host |
+| Per-Query Latency | Standard CPU | 0.085ms aggregate mean on recorded host |
 
-**Note:** The current benchmark focuses on the prompt classifier layer to demonstrate the pattern-based detection methodology. GPU resources are required only for embedding generation and similarity search in full RAG deployments. The lightweight pattern matching operates efficiently on standard hardware.
-
----
-
-*Published in IJCESEN, 2026 — DOI 10.22399/ijcesen.4869*
-*Version: 3.0 (Extended: two-tier evaluation reconciliation, 2025-2026 related work, scoped novelty claims, threat-landscape grounding)*
-*Date: July 2026*
+**Note:** The current benchmark focuses on the prompt classifier layer and requires no GPU. Optional neural detection, embedding generation, and vector search may use accelerator-specific extras in larger RAG deployments; the released pattern-only benchmark runs on a standard CPU.

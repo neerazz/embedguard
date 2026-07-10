@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import json
+import math
 import sys
 import time
 from pathlib import Path
@@ -129,7 +130,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
             for name, sig in result.layer_signals.items():
                 print(f"  {name}: score={sig.score:.3f}, conf={sig.confidence:.3f}")
 
-    return 0 if result.decision.value == "allow" else 1
+    return 0 if result.decision.value in {"allow", "log"} else 1
 
 
 def cmd_check(args: argparse.Namespace) -> int:
@@ -160,6 +161,10 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     with open(dataset_path) as f:
         dataset = json.load(f)
 
+    if not isinstance(dataset, list) or not dataset:
+        print("Error: Dataset must be a non-empty JSON array", file=sys.stderr)
+        return 1
+
     # Initialize EmbedGuard
     config = EmbedGuardConfig(mode=OperationalMode(args.mode))
     guard = EmbedGuard(config)
@@ -170,12 +175,21 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
         "correct": 0,
         "false_positives": 0,
         "false_negatives": 0,
+        "attack_samples": 0,
+        "benign_samples": 0,
         "latencies": [],
     }
 
     print(f"Running benchmark on {len(dataset)} samples...")
 
-    for item in dataset:
+    classification_threshold = config.get_threshold("threat_score_flag")
+    for index, item in enumerate(dataset):
+        if not isinstance(item, dict) or not isinstance(item.get("is_attack"), bool):
+            print(
+                f"Error: Sample {index} must be an object with boolean is_attack",
+                file=sys.stderr,
+            )
+            return 1
         query = item.get("query", "")
         documents = [Document(content=d) for d in item.get("documents", [])]
         expected_attack = item.get("is_attack", False)
@@ -184,10 +198,16 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
         result = guard.analyze(query, documents)
         latency = (time.perf_counter() - start) * 1000
 
-        detected_attack = result.decision.value != "allow"
+        # Measure classification at the configured flag threshold. Operational
+        # mode changes enforcement/logging, not whether the score is suspicious.
+        detected_attack = result.threat_score >= classification_threshold
 
         results["total"] += 1
         results["latencies"].append(latency)
+        if expected_attack:
+            results["attack_samples"] += 1
+        else:
+            results["benign_samples"] += 1
 
         if detected_attack == expected_attack:
             results["correct"] += 1
@@ -199,13 +219,27 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     # Calculate metrics
     accuracy = results["correct"] / results["total"] * 100
     avg_latency = sum(results["latencies"]) / len(results["latencies"])
-    p95_latency = sorted(results["latencies"])[int(len(results["latencies"]) * 0.95)]
+    p95_index = math.ceil(len(results["latencies"]) * 0.95) - 1
+    p95_latency = sorted(results["latencies"])[p95_index]
+    false_positive_rate = (
+        results["false_positives"] / results["benign_samples"] * 100
+        if results["benign_samples"]
+        else 0.0
+    )
+    false_negative_rate = (
+        results["false_negatives"] / results["attack_samples"] * 100
+        if results["attack_samples"]
+        else 0.0
+    )
 
     output = {
         "total_samples": results["total"],
+        "attack_samples": results["attack_samples"],
+        "benign_samples": results["benign_samples"],
+        "classification_threshold": classification_threshold,
         "accuracy": accuracy,
-        "false_positive_rate": results["false_positives"] / results["total"] * 100,
-        "false_negative_rate": results["false_negatives"] / results["total"] * 100,
+        "false_positive_rate": false_positive_rate,
+        "false_negative_rate": false_negative_rate,
         "avg_latency_ms": avg_latency,
         "p95_latency_ms": p95_latency,
     }

@@ -54,7 +54,7 @@ class LayerSignal:
 
 @dataclass
 class AttestationResult:
-    """Result of TEE attestation verification."""
+    """Result of embedding-provenance verification by the HMAC simulator."""
 
     is_valid: bool
     document_hash: Optional[str] = None

@@ -74,8 +74,10 @@ def main():
     print(f"    Decision: {result.decision.value}")
     print(f"    Detected Attacks: {[a.value for a in result.detected_attacks]}")
 
-    if result.decision != Decision.ALLOW:
-        print("    ⚠️  Attack detected and mitigated!")
+    if result.decision in {Decision.FLAG, Decision.BLOCK}:
+        print("    ⚠️  Attack signal detected; the caller must enforce the decision.")
+    elif result.decision == Decision.LOG:
+        print("    ℹ️  Attack signal observed in passive mode; processing continues.")
 
     # ==========================================================================
     # 4. Use high security preset
@@ -124,7 +126,12 @@ def main():
 
     for i, query in enumerate(queries):
         result = guard.analyze(query, documents)
-        status = "✓ SAFE" if result.decision == Decision.ALLOW else "⚠ FLAGGED"
+        status = {
+            Decision.ALLOW: "✓ SAFE",
+            Decision.LOG: "ℹ OBSERVED",
+            Decision.FLAG: "⚠ FLAGGED",
+            Decision.BLOCK: "⛔ BLOCKED",
+        }[result.decision]
         print(f"    [{i+1}] {status} - Score: {result.threat_score:.2f} - '{query[:40]}...'")
 
     # ==========================================================================
@@ -136,7 +143,7 @@ def main():
     stats = guard.get_stats()
     print(f"Total queries processed: {stats['queries_processed']}")
     print(f"Active layers: {sum(stats['layers_enabled'].values())}/4")
-    print("\nEmbedGuard is ready to protect your RAG system!")
+    print("\nReference checks completed. Validate and calibrate before deployment.")
 
 
 if __name__ == "__main__":

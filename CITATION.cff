@@ -3,7 +3,7 @@
 
 cff-version: 1.2.0
 message: "If you use EmbedGuard in your research, please cite it as below."
-title: "EmbedGuard: Cross-Layer Detection and Cryptographic Attestation for Secure Retrieval-Augmented Generation"
+title: "EmbedGuard: Cross-Layer Detection and Provenance Attestation for Adversarial Embedding Attacks in RAG Systems"
 type: software
 authors:
   - family-names: "Beshane"
@@ -23,8 +23,7 @@ identifiers:
 repository-code: "https://github.com/neerazz/embedguard"
 url: "https://github.com/neerazz/embedguard"
 license: MIT
-version: "1.1.0"
-date-released: "2026-07-09"
+version: "1.2.0"
 keywords:
   - "retrieval-augmented generation"
   - "RAG security"
@@ -33,19 +32,19 @@ keywords:
   - "trusted execution environment"
   - "machine learning security"
 abstract: |
-  EmbedGuard is a comprehensive security framework for protecting
-  Retrieval-Augmented Generation (RAG) systems against embedding space
-  poisoning attacks. It implements a 4-layer detection architecture
-  combining prompt injection detection, TEE-based embedding attestation,
-  retrieval distributional analysis, and output consistency verification
-  with a weighted threat correlation engine.
+  EmbedGuard is a prototype reference architecture for studying security
+  controls around Retrieval-Augmented Generation (RAG) systems. The released
+  package includes an 83-pattern prompt detector, an HMAC-based software
+  attestation simulator, experimental retrieval and output analyzers, and a
+  deterministic threat-correlation engine. Hardware-rooted attestation remains
+  a design target rather than a capability implemented by this package.
 references:
   - type: article
     authors:
       - family-names: "Beshane"
         given-names: "Neeraj Kumar Singh"
         orcid: "https://orcid.org/0009-0002-2125-1805"
-    title: "EmbedGuard: Cross-Layer Detection and Cryptographic Attestation for Secure Retrieval-Augmented Generation"
+    title: "EmbedGuard: Cross-Layer Detection and Provenance Attestation for Adversarial Embedding Attacks in RAG Systems"
     journal: "International Journal of Computational and Experimental Science and Engineering (IJCESEN)"
     year: 2026
     doi: "10.22399/ijcesen.4869"

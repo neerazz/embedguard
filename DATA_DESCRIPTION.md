@@ -2,13 +2,13 @@
 
 ## Overview
 
-This archive contains the EmbedGuard framework for protecting Retrieval-Augmented Generation (RAG) systems against embedding space poisoning attacks, including source code, benchmark datasets, attack samples, and experimental results.
+This archive contains the EmbedGuard reference implementation, locally curated benchmark-style inputs, attack regression samples, and recorded result artifacts. The open benchmark exercises only the pattern-based prompt detector; it does not reproduce the archived production-scale, TEE, corpus-poisoning, or cross-layer results reported by the IJCESEN article.
 
 ## Repository Structure
 
 ```
 embedguard/
-├── src/                     # Source code
+├── embedguard/              # Python package
 ├── data/                    # Datasets
 │   ├── benchmarks/          # Benign query datasets
 │   └── attacks/             # Attack sample datasets
@@ -20,13 +20,15 @@ embedguard/
 
 ## Datasets
 
-### Benchmark Datasets (Benign Queries)
+### Benchmark-Style Benign Queries
+
+The repository labels these local files after Natural Questions, HotpotQA, and MS-MARCO, but does not include upstream example identifiers, extraction manifests, source revisions, or checksums. Treat them as curated benchmark-style regression inputs rather than verified subsets of the named upstream datasets.
 
 | Dataset | Samples | Format | Description |
 |---------|---------|--------|-------------|
-| Natural Questions (NQ) | 50 | JSONL | Factoid Q&A pairs from Google |
-| HotpotQA | 25 | JSONL | Multi-hop reasoning questions |
-| MS-MARCO | 25 | JSONL | Passage retrieval queries |
+| Natural Questions-style | 50 | JSONL | Locally curated factoid questions |
+| HotpotQA-style | 25 | JSONL | Locally curated multi-hop questions |
+| MS-MARCO-style | 25 | JSONL | Locally curated passage-retrieval queries |
 
 **Total benign samples:** 100
 
@@ -35,9 +37,9 @@ embedguard/
 | Dataset | Samples | Format | Description |
 |---------|---------|--------|-------------|
 | Prompt Injection | 35 | JSONL | 30 attacks + 5 benign controls |
-| Corpus Poisoning | 25 | JSONL | Embedding manipulation attacks |
+| Corpus Poisoning | 25 | JSONL | Prototype samples; not run by the Tier-2 benchmark |
 
-**Total attack samples:** 60
+The reproducible Tier-2 benchmark runs the 30 prompt attacks, the 5 prompt-file benign controls, and the 100 benchmark-style benign queries: 135 inputs total. It does not run the corpus-poisoning file.
 
 ## Data Formats
 
@@ -64,38 +66,35 @@ embedguard/
 
 ## Experimental Results
 
-Results from real execution of the benchmark runner:
+The canonical v1.2 recorded run is `results/benchmark_results_20260710_025640.json`:
 
-- **Detection Rate (Recall):** 43.3% (pattern-based)
-- **Precision:** 100.0%
-- **False Positive Rate:** 0.0%
-- **F1 Score:** 0.605
-- **Mean Latency:** 0.02ms
-- **P95 Latency:** 0.05ms
+- **Included attacks detected:** 30/30
+- **Included benign queries flagged:** 0/105
+- **Detection-rate 95% Wilson interval:** 88.65%-100%
+- **Specificity 95% Wilson interval:** 96.47%-100%
+
+These are regression-set observations, not population estimates of production security. The JSON records SHA-256 hashes for every benchmark input and relevant source file, the nearest checked-out source commit when available, Python/platform/dependency versions, and timer characteristics. The file hashes bind the exact benchmark implementation even when Git metadata is absent, as in the Docker image. Latency remains a one-repetition, host- and load-dependent observation rather than a reproducible performance guarantee.
 
 ## Reproducibility
 
 ### Requirements
-- Python 3.9+
-- Dependencies: numpy, loguru, pydantic
+- Python 3.10+
+- Project dependencies from `pyproject.toml`
 
 ### Running Benchmarks
 ```bash
-cd embedguard
-python3 -m venv .venv
-source .venv/bin/activate
-pip install numpy loguru pydantic
-python examples/run_benchmarks.py --all
+./reproduce.sh
 ```
 
 ### Output
 Results are saved to `results/` directory as:
-- `latest_results.json` - Machine-readable metrics
+- `benchmark_results_<timestamp>.json` - Machine-readable metrics
 - `benchmark_report_*.md` - Human-readable report
+- `statistical_analysis.json` - Wilson-interval summary derived from observed counts
 
 ## License
 
-Apache License 2.0
+MIT License; see `LICENSE`.
 
 ## Citation
 
@@ -107,4 +106,4 @@ For questions about this dataset, please open an issue on the GitHub repository.
 
 ---
 
-Generated: 2026-01-24
+Updated: 2026-07-10

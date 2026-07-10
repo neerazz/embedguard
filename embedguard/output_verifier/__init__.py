@@ -1,18 +1,15 @@
 """
 Layer 4: Output Consistency Verification.
 
-This module implements perturbation-based stability testing to detect
-output manipulation through document-level perturbations.
-
-Performance (from paper):
-    - Stability score computation: 12.8ms per query
-    - Triggered for <0.1% of queries (elevated threat only)
-    - K=5 perturbations default
+This experimental module perturbs document sets and compares outputs produced
+in one consistent execution domain: either deterministic synthetic proxies or
+a caller-supplied generator callback. Sentence-transformer similarity is
+opt-in; the default uses deterministic Jaccard overlap and downloads no model.
 """
 
 import random
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 from loguru import logger
@@ -29,8 +26,10 @@ class OutputConsistencyVerifier:
     2. Computing semantic similarity between outputs
     3. Flagging unstable outputs that vary significantly
 
-    This layer is only triggered for queries with elevated threat
-    signals from prior layers (<0.1% of traffic per paper).
+    The framework invokes this layer for an elevated prior signal or when the
+    caller provides generator access. A real generated output can only be
+    evaluated when the same generator can be rerun on perturbations. The open
+    benchmark does not validate trigger frequency, separation, or latency.
 
     Attributes:
         model_name: Embedding model for semantic similarity
@@ -60,6 +59,7 @@ class OutputConsistencyVerifier:
         k_perturbations: int = 5,
         stability_threshold: float = 0.65,
         random_seed: int = 42,
+        use_semantic_model: bool = False,
     ):
         """Initialize the output verifier.
 
@@ -69,12 +69,15 @@ class OutputConsistencyVerifier:
             k_perturbations: Number of perturbations per query (K=5)
             stability_threshold: Minimum required stability
             random_seed: Random seed for reproducibility
+            use_semantic_model: Use sentence-transformer similarity. Disabled
+                by default to avoid implicit model downloads.
         """
         self.model_name = model_name
         self.device = device
         self.k_perturbations = k_perturbations
         self.stability_threshold = stability_threshold
         self.random_seed = random_seed
+        self.use_semantic_model = use_semantic_model
 
         # Lazy load embedding model
         self._embedding_model = None
@@ -87,6 +90,8 @@ class OutputConsistencyVerifier:
 
     def _get_embedding_model(self):
         """Lazily load embedding model."""
+        if not self.use_semantic_model:
+            return None
         if self._embedding_model is None:
             try:
                 from sentence_transformers import SentenceTransformer
@@ -105,13 +110,16 @@ class OutputConsistencyVerifier:
         query: str,
         documents: List[Document],
         generated_output: Optional[str] = None,
+        output_generator: Optional[Callable[[str, List[Document]], str]] = None,
     ) -> Tuple[float, float, Dict[str, Any]]:
         """Verify output consistency through perturbation testing.
 
         Args:
             query: The user query
             documents: Retrieved documents
-            generated_output: Optional pre-generated output to test
+            generated_output: Optional baseline output from ``output_generator``
+            output_generator: Optional callback used for both the original and
+                every perturbed document set. Required for real-output testing.
 
         Returns:
             Tuple of (instability_score, confidence, details)
@@ -119,6 +127,16 @@ class OutputConsistencyVerifier:
         """
         if not documents:
             return 0.0, 0.0, {"error": "No documents provided"}
+
+        if generated_output is not None and output_generator is None:
+            return 0.0, 0.0, {
+                "status": "not_evaluated",
+                "evaluation_mode": "real_output_requires_generator",
+                "error": (
+                    "generated_output cannot be compared with synthetic "
+                    "perturbations; provide output_generator"
+                ),
+            }
 
         details: Dict[str, Any] = {
             "num_documents": len(documents),
@@ -134,20 +152,32 @@ class OutputConsistencyVerifier:
         if not perturbations:
             return 0.0, 0.3, {"error": "Could not generate perturbations"}
 
-        # Compute outputs for each perturbation (simulated)
         outputs = []
-        if generated_output:
-            outputs.append(generated_output)
+        if output_generator is not None:
+            details["evaluation_mode"] = "generator_callback"
+            try:
+                outputs.append(
+                    generated_output
+                    if generated_output is not None
+                    else output_generator(query, documents)
+                )
+                for perturbed_docs, strategy in perturbations:
+                    details["strategies_used"].append(strategy)
+                    outputs.append(output_generator(query, perturbed_docs))
+            except Exception as exc:
+                return 0.0, 0.0, {
+                    "status": "not_evaluated",
+                    "evaluation_mode": "generator_callback",
+                    "error": f"output_generator failed: {exc}",
+                }
         else:
-            # Generate baseline output from original documents
-            baseline_output = self._generate_synthetic_output(query, documents)
-            outputs.append(baseline_output)
-
-        # Generate outputs for perturbations
-        for i, (perturbed_docs, strategy) in enumerate(perturbations):
-            details["strategies_used"].append(strategy)
-            perturbed_output = self._generate_synthetic_output(query, perturbed_docs)
-            outputs.append(perturbed_output)
+            details["evaluation_mode"] = "synthetic_proxy"
+            outputs.append(self._generate_synthetic_output(query, documents))
+            for perturbed_docs, strategy in perturbations:
+                details["strategies_used"].append(strategy)
+                outputs.append(
+                    self._generate_synthetic_output(query, perturbed_docs)
+                )
 
         # Compute pairwise similarities
         similarities = self._compute_output_similarities(outputs)
@@ -263,8 +293,8 @@ class OutputConsistencyVerifier:
     ) -> str:
         """Generate synthetic output for testing.
 
-        In production, this would call the actual LLM. For testing,
-        we generate a deterministic output based on document content.
+        This reference implementation does not call an LLM. It generates a
+        deterministic text proxy from the document content.
         """
         # Concatenate key content from documents
         doc_contents = [d.content[:200] for d in documents[:3]]

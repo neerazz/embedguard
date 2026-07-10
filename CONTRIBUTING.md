@@ -37,10 +37,9 @@ Please be respectful and constructive in all interactions. We welcome contributi
    pytest tests/
    ```
 
-6. **Format your code**:
+6. **Run the release static-safety gate**:
    ```bash
-   ruff format src/ tests/
-   ruff check src/ tests/ --fix
+   ruff check .
    ```
 
 7. **Update documentation** if needed
@@ -65,7 +64,7 @@ Please be respectful and constructive in all interactions. We welcome contributi
 ### Testing
 
 - Write unit tests for new functionality
-- Maintain test coverage above 80%
+- Keep or improve coverage for the code you change
 - Use descriptive test names
 - Include both positive and negative test cases
 
@@ -140,14 +139,8 @@ pytest -v tests/
 ### Code Quality
 
 ```bash
-# Linting
-ruff check src/ tests/
-
-# Formatting
-ruff format src/ tests/
-
-# Type checking
-mypy src/
+# Parse/runtime-fatal static checks configured in pyproject.toml
+ruff check .
 ```
 
 ## Architecture Overview
@@ -155,16 +148,15 @@ mypy src/
 For contributors new to the codebase:
 
 ```
-src/embedguard/
+embedguard/
 ├── core.py                 # Main EmbedGuard class - entry point
 ├── config.py               # Configuration management
 ├── types.py                # Type definitions
 ├── prompt_detector/        # Layer 1: Prompt injection detection
-├── embedding_attestation/  # Layer 2: TEE attestation (optional)
+├── embedding_attestation/  # Layer 2: HMAC provenance simulator
 ├── retrieval_analyzer/     # Layer 3: Distribution analysis
 ├── output_verifier/        # Layer 4: Consistency verification
-├── correlation_engine/     # Signal fusion and decision making
-└── utils/                  # Shared utilities
+└── correlation_engine/     # Signal fusion and decision making
 ```
 
 ### Key Classes

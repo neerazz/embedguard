@@ -4,10 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "embedguard"
-version = "1.1.0"
+version = "1.2.0"
 description = "Cross-Layer Detection and Provenance Attestation for Adversarial Embedding Attacks in RAG Systems"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     {name = "Neeraj Kumar Singh Beshane", email = "b.neerajkumarsingh@gmail.com"}
 ]
@@ -28,7 +29,7 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
+
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -39,20 +40,17 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "torch>=2.0.0",
-    "transformers>=4.30.0",
-    "sentence-transformers>=2.2.0",
     "numpy>=1.24.0",
     "scipy>=1.10.0",
     "scikit-learn>=1.3.0",
-    "faiss-cpu>=1.7.4",
     "pydantic>=2.0.0",
-    "tqdm>=4.65.0",
     "loguru>=0.7.0",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "build>=1.2.1",
+    "matplotlib>=3.7.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-asyncio>=0.21.0",
@@ -60,16 +58,21 @@ dev = [
     "isort>=5.12.0",
     "mypy>=1.0.0",
     "ruff>=0.0.270",
+    "twine>=5.0.0",
 ]
 gpu = [
     "faiss-gpu>=1.7.4",
 ]
-tee = [
-    "cryptography>=41.0.0",
-    "pyopenssl>=23.0.0",
+neural = [
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "sentence-transformers>=2.2.0",
+]
+vector = [
+    "faiss-cpu>=1.7.4",
 ]
 all = [
-    "embedguard[dev,gpu,tee]",
+    "embedguard[dev,neural,vector]",
 ]
 
 [project.urls]
@@ -125,5 +128,8 @@ addopts = "-v --cov=embedguard --cov-report=term-missing"
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-select = ["E", "F", "W", "I", "N", "D", "UP", "B", "C4", "SIM"]
-ignore = ["D100", "D104", "D107"]
+
+[tool.ruff.lint]
+# The release gate covers parse errors and undefined names. Broader style debt is
+# intentionally not advertised as a passing gate until it has a clean baseline.
+select = ["E9", "F63", "F7", "F82"]

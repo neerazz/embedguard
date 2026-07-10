@@ -16,8 +16,10 @@ class TestEmbedGuardConfig:
 
         assert config.mode == OperationalMode.GATED
         assert config.enable_prompt_detection is True
+        assert config.enable_neural_prompt_detection is False
         assert config.enable_retrieval_analysis is True
         assert config.enable_output_verification is True
+        assert config.use_semantic_output_similarity is False
         assert config.enable_tee is False
         assert config.device == "cpu"
 
@@ -37,7 +39,7 @@ class TestEmbedGuardConfig:
         """Test preset configurations."""
         high_sec = get_preset_config("high_security")
         assert high_sec.mode == OperationalMode.ACTIVE
-        assert high_sec.enable_tee is True
+        assert high_sec.enable_tee is False
 
         balanced = get_preset_config("balanced")
         assert balanced.mode == OperationalMode.GATED
@@ -60,6 +62,15 @@ class TestEmbedGuardConfig:
         """Test layer weight getter with default."""
         config = EmbedGuardConfig()
         assert config.get_layer_weight("nonexistent") == 0.25
+
+    @pytest.mark.parametrize(
+        "audit_config",
+        [{"enable_audit_log": True}, {"audit_log_path": "audit.log"}],
+    )
+    def test_unimplemented_audit_persistence_fails_closed(self, audit_config):
+        """Deprecated no-op persistence fields must not imply a capability."""
+        with pytest.raises(ValueError, match="does not persist audit logs"):
+            EmbedGuardConfig(**audit_config)
 
 
 class TestEmbedGuard:

@@ -1,8 +1,8 @@
-"""
-EmbedGuard: Cross-Layer Detection and Provenance Attestation for Adversarial Embedding Attacks in RAG Systems.
+"""EmbedGuard reference components for adversarial RAG experiments.
 
-This module provides the main EmbedGuard framework for protecting RAG systems against
-embedding space poisoning attacks through cross-layer detection and cryptographic attestation.
+The released package coordinates pattern detection, an HMAC provenance simulator,
+experimental retrieval analysis, output-consistency proxies, and deterministic fusion.
+It does not provide hardware-backed attestation.
 
 Example:
     >>> from embedguard import EmbedGuard, EmbedGuardConfig
@@ -10,6 +10,7 @@ Example:
     >>> guard = EmbedGuard(config)
     >>> result = guard.analyze(query, documents)
     >>> print(result.threat_score)
+
 """
 
 from embedguard.config import EmbedGuardConfig
@@ -21,7 +22,7 @@ from embedguard.types import (
     ThreatLevel,
 )
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __author__ = "Neeraj Kumar Singh Beshane"
 __email__ = "b.neerajkumarsingh@gmail.com"
 

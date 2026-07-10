@@ -2,9 +2,9 @@
 """EmbedGuard paper figures.
 
 Figures 1-2 are drawn diagrams (matplotlib primitives, vector output).
-Figures 3-4 are plotted from data: Figure 3 from the committed benchmark
-results JSON (results/benchmark_results_20260125_005427.json), Figure 4
-from the Tier-1 ablation table in the published article (Section 4.1).
+Figures 3-4 are plotted from committed data: Figure 3 from the Tier-2
+benchmark JSON and Figure 4 from a machine-readable transcription of the
+Tier-1 ablation table in the published article (Section 4.1).
 
 Usage:  python3 paper/scripts/generate_figures.py
 Output: paper/images/figure_{1,2,3,4}.{png,pdf}
@@ -18,7 +18,8 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "paper" / "images"
-RESULTS = ROOT / "results" / "benchmark_results_20260125_005427.json"
+RESULTS = ROOT / "results" / "benchmark_results_20260710_025640.json"
+TIER1_ABLATION = ROOT / "paper" / "data" / "tier1_ablation_vor.json"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -39,14 +40,6 @@ plt.rcParams.update({
 
 INK = "#1a1a2e"
 GRAY = "#8a8f98"
-LAYERS = [  # name, weight, latency label, fill
-    ("Layer 1 · Prompt Injection Detection\n81-pattern classifier", 0.35, "0.04 ms", "#dbe7f4"),
-    ("Layer 2 · Embedding Attestation\nTEE (AMD SEV-SNP) certificate check", 0.75, "0.3 ms/doc", "#dcefdd"),
-    ("Layer 3 · Retrieval Analysis\nincremental PCA + KL divergence", 0.50, "15.2 ms", "#fdeeda"),
-    ("Layer 4 · Output Verification\nperturbation stability (flagged only)", 0.20, "6.3 ms", "#ece2f4"),
-]
-
-
 def _box(ax, x, y, w, h, text, fc, fontsize=8.5, ec=INK, lw=1.0, weight="normal"):
     ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.012,rounding_size=0.015",
                                 fc=fc, ec=ec, lw=lw))
@@ -68,55 +61,21 @@ def figure_1_architecture():
     figure1_architecture.main()
 
 
-def _unused_figure_1_boxes():
-    """Superseded by figure1_architecture.py; kept out of the build."""
-    fig, ax = plt.subplots(figsize=(7.0, 4.6))
-    ax.set_xlim(0, 10); ax.set_ylim(0, 7.1); ax.axis("off")
-
-    # untrusted inputs
-    _box(ax, 0.25, 6.25, 2.5, 0.65, "User query", "#f6f7f9")
-    _box(ax, 3.05, 6.25, 2.5, 0.65, "Document corpus\n(untrusted)", "#f6f7f9", fontsize=8)
-    ax.text(2.9, 7.05, "Untrusted input", fontsize=8, color=GRAY, ha="center", style="italic")
-
-    # detection layers
-    ys = [4.85, 3.65, 2.45, 1.25]
-    for (label, w, lat, fc), y in zip(LAYERS, ys):
-        _box(ax, 0.25, y, 5.3, 0.95, label, fc, fontsize=8.3)
-        ax.text(5.72, y + 0.62, f"β = {w:.2f}", fontsize=8, color=INK, ha="left")
-        ax.text(5.72, y + 0.28, lat, fontsize=7.5, color=GRAY, ha="left")
-        _arrow(ax, 6.6, y + 0.475, 7.35, y + 0.475, color=GRAY, lw=1.0)
-
-    _arrow(ax, 1.5, 6.25, 1.5, 5.8)
-    _arrow(ax, 4.3, 6.25, 4.3, 5.8)
-    for y0, y1 in zip(ys[:-1], ys[1:]):
-        _arrow(ax, 2.9, y0, 2.9, y1 + 0.95)
-
-    # correlation engine
-    _box(ax, 7.35, 1.25, 2.4, 4.55, "", "#f1f3f6")
-    ax.text(8.55, 5.25, "Threat Correlation\nEngine", ha="center", fontsize=9,
-            fontweight="bold", color=INK, linespacing=1.3)
-    ax.text(8.55, 4.15, r"ThreatScore = $\Sigma_i\,\beta_i s_i$", ha="center", fontsize=8.5, color=INK)
-    ax.text(8.55, 3.45, "flag ≥ 0.70\nblock ≥ 0.85", ha="center", fontsize=8, color=GRAY, linespacing=1.4)
-
-    # decisions
-    _arrow(ax, 8.55, 1.25, 8.55, 0.82)
-    for x, lbl, fc in [(6.0, "ALLOW", "#dcefdd"), (7.7, "FLAG", "#fdeeda"), (9.4, "BLOCK", "#f6dbdb")]:
-        _box(ax, x - 0.72, 0.1, 1.44, 0.55, lbl, fc, fontsize=8, weight="bold")
-    _arrow(ax, 8.55, 0.82, 6.0, 0.65, color=GRAY, lw=0.9)
-    _arrow(ax, 8.55, 0.82, 7.7, 0.65, color=GRAY, lw=0.9)
-    _arrow(ax, 8.55, 0.82, 9.4, 0.65, color=GRAY, lw=0.9)
-    ax.text(4.4, 0.38, "passive / gated / active mode", fontsize=7.5, color=GRAY, ha="right", style="italic")
-
-    fig.savefig(OUT / "figure_1.png"); fig.savefig(OUT / "figure_1.pdf")
-    plt.close(fig)
-
-
 def figure_2_tee_protocol():
-    """TEE attestation as a sequence diagram: ingestion vs retrieval time."""
-    fig, ax = plt.subplots(figsize=(6.8, 4.2))
-    ax.set_xlim(0, 10); ax.set_ylim(0, 6.8); ax.axis("off")
+    """Target TEE protocol as a sequence diagram: design, not package behavior."""
+    fig, ax = plt.subplots(figsize=(6.8, 4.5))
+    ax.set_xlim(0, 10); ax.set_ylim(0, 7.35); ax.axis("off")
+    ax.text(
+        5.0,
+        7.15,
+        "Target AMD SEV-SNP protocol — design only; not implemented in the released package",
+        ha="center",
+        fontsize=8.2,
+        color=INK,
+        fontweight="bold",
+    )
 
-    actors = [(1.3, "Document\nsource"), (4.0, "TEE enclave\n(SEV-SNP)"),
+    actors = [(1.3, "Document\nsource"), (4.0, "Confidential VM\n(SEV-SNP)"),
               (6.7, "Vector store"), (9.0, "Retrieval\nverifier")]
     for x, name in actors:
         _box(ax, x - 0.85, 6.0, 1.7, 0.7, name, "#f1f3f6", fontsize=8)
@@ -128,21 +87,34 @@ def figure_2_tee_protocol():
                 ha="center", fontsize=7.6, color=INK)
 
     ax.text(0.12, 5.55, "Ingestion", fontsize=8, color=GRAY, rotation=90, va="top")
-    msg(5.35, 1.3, 4.0, "document D")
+    msg(5.65, 9.0, 4.0, "fresh challenge nonce N (recorded)")
+    msg(5.25, 1.3, 4.0, "document D")
     # enclave internal note
-    _box(ax, 2.95, 4.35, 2.1, 0.75,
-         "embed inside enclave\ncert = sign(H(D), H(model),\nE, T, PCRs)", "#dcefdd", fontsize=6.8)
-    msg(3.95, 4.0, 6.7, "E + attestation cert")
+    _box(ax, 2.65, 4.15, 2.7, 1.10,
+         "E = f_model(D)\nB = H(H(D)||H(model)||H(E)||T||N)\n"
+         "request SNP report\nREPORT_DATA = B",
+         "#dcefdd", fontsize=5.35)
+    msg(3.75, 4.0, 6.7, "E + bound metadata + SNP report + N")
 
     ax.plot([0.1, 9.9], [3.45, 3.45], color=GRAY, lw=0.6)
     ax.text(0.12, 3.1, "Retrieval", fontsize=8, color=GRAY, rotation=90, va="top")
     msg(2.85, 9.0, 6.7, "query top-k", above=True)
-    msg(2.35, 6.7, 9.0, "candidates + certs")
-    _box(ax, 7.9, 1.15, 2.0, 0.85,
-         "verify: signature,\nmodel hash, validity\nwindow, platform PCRs", "#dbe7f4", fontsize=6.8)
-    msg(0.85, 9.0, 6.7, "reject unverified embeddings", above=False)
+    msg(2.35, 6.7, 9.0, "candidates + bound SNP reports")
+    _box(ax, 7.50, 0.95, 2.20, 1.30,
+         "validate ARK/ASK/VCEK chain\nverify report signature with VCEK\n"
+         "recompute REPORT_DATA binding\ncheck replay cache + max age\n"
+         "enforce measurement/policy/TCB", "#dbe7f4", fontsize=5.15)
+    msg(0.85, 9.0, 6.7, "verification result: reject", above=False)
 
-    ax.text(5.0, 6.75, "", fontsize=1)
+    ax.text(
+        5.0,
+        0.18,
+        "Released code uses software HMAC binding only; it obtains no SNP report or AMD endorsement chain.",
+        ha="center",
+        fontsize=6.5,
+        color=GRAY,
+        style="italic",
+    )
     fig.savefig(OUT / "figure_2.png"); fig.savefig(OUT / "figure_2.pdf")
     plt.close(fig)
 
@@ -150,8 +122,8 @@ def figure_2_tee_protocol():
 def figure_3_latency():
     """Per-dataset latency stats plotted from the committed benchmark JSON."""
     data = json.loads(RESULTS.read_text())
-    order = [("injection", "Injection\nattacks"), ("nq", "Natural\nQuestions"),
-             ("hotpotqa", "HotpotQA"), ("msmarco", "MS-MARCO")]
+    order = [("injection", "Injection set\n30 attacks + 5 benign"), ("nq", "NQ-style"),
+             ("hotpotqa", "HotpotQA-style"), ("msmarco", "MS-MARCO-style")]
     stats = [data["benchmarks"][k]["latency_stats"] for k, _ in order]
     labels = [lbl for _, lbl in order]
 
@@ -163,40 +135,51 @@ def figure_3_latency():
     mins = [s["min_ms"] for s in stats]
     maxs = [s["max_ms"] for s in stats]
 
-    for i, s in enumerate(stats):
+    for i in range(len(stats)):
         ax.plot([i, i], [mins[i], maxs[i]], color=GRAY, lw=1.0, zorder=1)
         ax.plot([i - 0.1, i + 0.1], [mins[i]] * 2, color=GRAY, lw=1.0)
         ax.plot([i - 0.1, i + 0.1], [maxs[i]] * 2, color=GRAY, lw=1.0)
     ax.scatter(x, means, s=46, color="#2f6db3", zorder=3, label="mean")
     ax.scatter(x, p95, s=34, marker="D", color="#c9803a", zorder=3, label="p95")
     ax.scatter(x, p99, s=40, marker="^", color="#a54242", zorder=3, label="p99")
+    ax.plot([], [], color=GRAY, lw=1.0, label="min–max")
 
     ax.set_xticks(list(x)); ax.set_xticklabels(labels)
     ax.set_ylabel("Detection latency (ms)")
-    ax.set_ylim(0, 0.185)
-    ax.legend(frameon=False, loc="upper right", ncols=3)
+    ax.set_ylim(0, max(maxs) * 1.12)
+    ax.legend(frameon=False, loc="upper right", ncols=4)
     ax.grid(axis="y", alpha=0.25, lw=0.5)
     n = data["aggregate"]["total_samples_processed"]
-    ax.set_title(f"Prompt-layer detection latency by dataset (N={n}, single run)",
+    run_date = data["timestamp"].split("T", maxsplit=1)[0]
+    ax.set_title(f"Tier-2 prompt-layer latency — {run_date} (N={n}, single run)",
                  fontsize=9, fontweight="normal", color=INK)
+    ax.text(
+        0.5,
+        -0.26,
+        f"Source: {RESULTS.relative_to(ROOT)} · host-dependent timing",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=6.2,
+        color=GRAY,
+    )
     fig.savefig(OUT / "figure_3.png"); fig.savefig(OUT / "figure_3.pdf")
     plt.close(fig)
 
 
 def figure_4_ablation():
-    """Tier-1 cross-layer ablation (values from the published article, Sec. 4.1)."""
-    rows = [
-        ("Full system (4 layers)", 94.7),
-        ("w/o output layer", 91.2),
-        ("w/o prompt layer", 89.8),
-        ("w/o retrieval layer", 87.4),
-        ("w/o embedding TEE", 84.6),
-        ("Embedding only\n(best single layer)", 76.3),
-    ]
+    """Plot the archived Tier-1 ablation transcription without causal overclaiming."""
+    with TIER1_ABLATION.open(encoding="utf-8") as handle:
+        evidence = json.load(handle)
+    rows = [(row["label"], row["detection_rate_percent"]) for row in evidence["rows"]]
     labels = [r[0] for r in rows][::-1]
     vals = [r[1] for r in rows][::-1]
 
     fig, ax = plt.subplots(figsize=(5.6, 2.9))
+    ax.set_title(
+        "Tier-1 version-of-record ablation (not reproduced by the open benchmark)",
+        fontsize=8.5,
+        pad=10,
+    )
     colors = ["#b8c4cf"] * len(vals)
     colors[-1] = "#2f6db3"          # full system
     colors[0] = "#c9803a"           # best single layer
@@ -205,16 +188,31 @@ def figure_4_ablation():
         ax.text(v - 0.6, b.get_y() + b.get_height() / 2, f"{v:.1f}",
                 va="center", ha="right", fontsize=8, color="white", fontweight="bold")
 
-    ax.set_xlim(70, 100)
+    ax.set_xlim(0, 100)
     ax.set_xlabel("Detection rate (%) — production-scale evaluation")
     ax.axvline(76.3, color="#c9803a", lw=0.8, ls=(0, (3, 3)), alpha=0.7)
     ax.axvline(94.7, color="#2f6db3", lw=0.8, ls=(0, (3, 3)), alpha=0.7)
     ax.annotate("", xy=(94.7, 5.42), xytext=(76.3, 5.42),
                 arrowprops=dict(arrowstyle="<->", color=INK, lw=0.9))
-    ax.text((94.7 + 76.3) / 2, 5.58, "+18.4 pp from cross-layer correlation",
-            ha="center", fontsize=8, color=INK)
+    ax.text(
+        (94.7 + 76.3) / 2,
+        5.58,
+        "+18.4 pp: full system vs best single layer",
+        ha="center",
+        fontsize=7.8,
+        color=INK,
+    )
     ax.set_ylim(-0.55, 6.1)
     ax.grid(axis="x", alpha=0.25, lw=0.5)
+    ax.text(
+        0.5,
+        -0.31,
+        "Archived comparison; not causal isolation · source DOI 10.22399/ijcesen.4869 · sample counts/CIs unavailable",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=6.2,
+        color=GRAY,
+    )
     fig.savefig(OUT / "figure_4.png"); fig.savefig(OUT / "figure_4.pdf")
     plt.close(fig)
 

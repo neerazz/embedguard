@@ -1,17 +1,15 @@
-"""Tests for neural classifier component.
+"""Tests for prompt normalization and optional neural classification."""
 
-These tests verify the classification logic independent of 
-full transformer inference using mocked model outputs.
-
-This addresses the critique point about test coverage for
-the neural classification path (previously only pattern-based
-detection was tested via use_neural=False).
-"""
+import sys
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
-import torch
-from unittest.mock import Mock, patch, MagicMock
-import numpy as np
+
+try:
+    import torch
+except ImportError:  # Optional neural extra is absent in the core test environment.
+    torch = None
 
 from embedguard.prompt_detector import PromptInjectionDetector, normalize_input
 
@@ -25,13 +23,15 @@ class TestNormalizeInput:
         result = normalize_input("I g n o r e all previous")
         assert "ignoreallprevious" in result.lower()
 
-    def test_unicode_homoglyphs(self):
-        """Test normalization of Cyrillic homoglyphs to Latin."""
-        # Cyrillic 'а' (U+0430) looks like Latin 'a' (U+0061)
-        cyrillic_a = "\u0430"
-        result = normalize_input(f"ignore{cyrillic_a}ll")
-        # After NFKC normalization, should be recognizable
-        assert "ignore" in result.lower() or "ignoreall" in result.lower()
+    def test_unicode_compatibility_characters(self):
+        """NFKC maps full-width Latin characters to their ASCII forms."""
+        result = normalize_input("ｉｇｎｏｒｅ all")
+        assert result == "ignoreall"
+
+    def test_nfkc_does_not_claim_cross_script_homoglyph_mapping(self):
+        """Cyrillic letters remain Cyrillic without a confusables mapper."""
+        result = normalize_input("Ignоre")  # Cyrillic 'о', not Latin 'o'.
+        assert result != "ignore"
 
     def test_zero_width_characters(self):
         """Test removal of zero-width characters used for evasion."""
@@ -54,6 +54,7 @@ class TestNormalizeInput:
         assert "ignore" in result.lower()
 
 
+@pytest.mark.skipif(torch is None, reason="install embedguard[neural] to run neural tests")
 class TestNeuralClassifier:
     """Test neural classification logic with mocked models."""
 
@@ -140,6 +141,32 @@ class TestNeuralClassifier:
         # Final score should be max of pattern and neural
         if details.get('pattern_score', 0) > 0 and details.get('neural_score', 0) > 0:
             assert score == max(details['pattern_score'], details['neural_score'])
+
+    def test_missing_fine_tuned_checkpoint_disables_neural_path(self):
+        """A random classification head must never be used as a detector."""
+        model_calls = []
+
+        class FakeAutoModel:
+            @staticmethod
+            def from_pretrained(name, **kwargs):
+                model_calls.append((name, kwargs))
+                if name == "embedguard/prompt-injection-classifier":
+                    raise OSError("checkpoint unavailable")
+                return MagicMock()
+
+        fake_transformers = SimpleNamespace(
+            AutoTokenizer=SimpleNamespace(from_pretrained=lambda _: MagicMock()),
+            AutoModelForSequenceClassification=FakeAutoModel,
+        )
+
+        with patch.dict(sys.modules, {"transformers": fake_transformers}):
+            detector = PromptInjectionDetector(use_neural=True)
+
+        assert detector.use_neural is False
+        assert detector.model is None
+        assert [name for name, _ in model_calls] == [
+            "embedguard/prompt-injection-classifier"
+        ]
 
 
 class TestPatternDetection:

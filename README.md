@@ -1,13 +1,14 @@
 # EmbedGuard: Cross-Layer Detection and Provenance Attestation for Adversarial Embedding Attacks in RAG Systems
 
-[![Paper: IJCESEN](https://img.shields.io/badge/IJCESEN-Q3-blue)](https://doi.org/10.22399/ijcesen.4869)
+[![Paper: IJCESEN](https://img.shields.io/badge/Paper-IJCESEN-blue)](https://doi.org/10.22399/ijcesen.4869)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![CI](https://github.com/neerazz/embedguard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/neerazz/embedguard/actions/workflows/ci.yml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18364919.svg)](https://doi.org/10.5281/zenodo.18364919)
 
 ## TL;DR
 
-Most RAG defenses sit at one layer — the input prompt, or the retrieved document. EmbedGuard correlates signals **across the embedding, retrieval, and generation layers**, plus hardware-backed cryptographic attestation of the embedding model itself.
+Most RAG defenses sit at one layer — the input prompt, or the retrieved document. EmbedGuard proposes correlation across prompt, embedding-provenance, retrieval, and output signals. The repository implements the correlation engine, an HMAC provenance simulator, and experimental retrieval/output proxies; hardware attestation remains a target design.
 
 | Metric | Value |
 |---|---|
@@ -18,11 +19,13 @@ Most RAG defenses sit at one layer — the input prompt, or the retrieved docume
 | **Cross-layer improvement (ablation)** | **+18.4 pp** vs best single-layer |
 | Validation scale | 500K embeddings, 47K queries |
 
-The +18.4 pp ablation is the headline: cross-layer correlation is *causally* responsible for the detection improvement — not a side effect of model choice or threshold tuning.
+The +18.4 pp ablation is the headline result reported in the IJCESEN version of record. The open repository benchmark does not independently reproduce that cross-layer experiment.
 
-The table above is the production-scale evaluation (requires TEE hardware + production corpus; documented in the published article). The repo also ships an **open benchmark you can run yourself** — `./reproduce.sh` exercises the prompt-layer detector on 135 samples (Natural Questions, HotpotQA, MS-MARCO + a 25-category injection set): 100% detection (30/30), 0% false positives (0/105), sub-millisecond latency. The two tiers and how they relate are laid out in [`paper/manuscript.md`](paper/manuscript.md) §4.
+The table above is the production-scale evaluation reported in the published article; the repository does not contain the production corpus or hardware evidence needed to audit it. The repo also ships an **open regression benchmark you can run yourself** — `./reproduce.sh` exercises the released pattern-only prompt detector on 135 locally curated samples labeled as Natural Questions-style, HotpotQA-style, MS-MARCO-style, and a 25-category injection set: 30/30 included attacks detected and 0/105 included benign queries flagged, with 95% Wilson intervals of 88.6%-100% and 96.5%-100%, respectively. The named benign files lack upstream IDs and extraction manifests and should not be treated as verified subsets of those public datasets. The two tiers and their evidence boundaries are laid out in [`paper/manuscript.md`](paper/manuscript.md) §4.
 
 Peer-reviewed: [IJCESEN, 2026 — DOI 10.22399/ijcesen.4869](https://doi.org/10.22399/ijcesen.4869).
+
+Post-publication manuscript v3.1: [Markdown](paper/manuscript.md) · [rendered PDF](paper/manuscript.pdf).
 
 ### Quick start
 
@@ -40,7 +43,7 @@ python examples/basic_usage.py
 
 ## Overview
 
-EmbedGuard addresses adversarial embedding attacks in Retrieval-Augmented Generation (RAG) systems through cross-layer detection and hardware-backed cryptographic attestation. This repository contains the reference implementation, benchmark data, and paper materials.
+EmbedGuard studies adversarial embedding attacks in Retrieval-Augmented Generation (RAG) systems through cross-layer detection and a hardware-rooted provenance design. This repository contains a reference implementation, an open prompt-detector regression benchmark, and paper materials; it does not contain a hardware-attestation implementation or the production-scale Tier-1 evidence.
 
 **Author**: Neeraj Kumar Singh Beshane
 **ORCID**: [0009-0002-2125-1805](https://orcid.org/0009-0002-2125-1805)
@@ -52,24 +55,25 @@ EmbedGuard addresses adversarial embedding attacks in Retrieval-Augmented Genera
 
 ## Abstract
 
-Embedding-based Retrieval-Augmented Generation (RAG) systems are critical infrastructure for production AI applications, yet they remain vulnerable to embedding space poisoning attacks that achieve disproportionate success with minimal payloads (1% corpus contamination, resulting in 80% attack success rates). Current single-layer defense approaches optimize for high-amplitude signals in narrow-dimensional subspaces, making them systematically vulnerable to coordinated cross-layer attacks that distribute adversarial signals across architectural layers.
+Embedding-based Retrieval-Augmented Generation (RAG) systems can be attacked at the query, corpus, retrieval, and generation stages. A detector at one stage can miss attacks whose observable effects appear elsewhere in that pipeline.
 
-EmbedGuard is an adaptive, cross-layer detection framework integrating hardware-backed cryptographic attestation with statistical anomaly detection across four RAG architectural layers:
+EmbedGuard is a cross-layer reference architecture that combines four signal classes:
 
 1. **Prompt Layer**: Injection detection
-2. **Embedding Layer**: Hardware attestation via Trusted Execution Environments (TEEs)
+2. **Embedding Layer**: Provenance simulation in the package; TEE attestation as a target design
 3. **Retrieval Layer**: Distributional analysis
 4. **Output Layer**: Consistency verification
 
 ## Key Features
 
-- **Cross-Layer Detection Architecture**: Unified security reasoning across four layers of the RAG architecture
-- **Cryptographic Provenance Attestation**: Hardware-backed embedding generation using TEEs
-- **Production-Scale Performance**: 94.7% detection rate with 51ms mean latency overhead
-- **Adaptive Attack Resilience**: 89.3% detection rate against adaptive attacks
-- **Flexible Deployment Modes**: Passive, gated, and active operational modes
+- **Cross-Layer Detection Architecture**: One decision over four signal classes
+- **Provenance Boundary**: HMAC simulation in the package; AMD SEV-SNP is a design target
+- **Evidence Boundary**: Archived Tier-1 publication claims are separated from open Tier-2 observations
+- **Decision Modes**: Passive, gated, and active mappings that application code must enforce
 
-## Performance Highlights
+## Archived Tier-1 Performance Highlights
+
+The table below transcribes the IJCESEN version-of-record claims. The open repository does not contain the raw evidence or environment needed to reproduce them.
 
 | Attack Type | Detection Rate | False Positive Rate | Mean Latency |
 |-------------|----------------|---------------------|---------------|
@@ -81,58 +85,62 @@ EmbedGuard is an adaptive, cross-layer detection framework integrating hardware-
 
 ## Key Contributions
 
-1. **Cross-Layer Signal Fusion**: To our knowledge, the first defense that fuses anomaly signals from all four RAG layers into a single correlated detection decision (prior layered defenses run layers as independent filters), providing 18.4 percentage point improvement over the best single-layer approach
+1. **Cross-Layer Signal Fusion**: A four-layer reference architecture that combines prompt, provenance, retrieval, and output signals in one decision. The IJCESEN version of record reports an 18.4 percentage-point ablation gain; the open benchmark does not reproduce that experiment.
 
-2. **Hardware-Backed Attestation**: Embedding provenance bound to a TEE-attested execution environment (AMD SEV-SNP) — a hardware root of trust extending software-signature provenance approaches
+2. **Hardware-Rooted Attestation Design**: A target AMD SEV-SNP protocol for binding embeddings to source/model measurements. The released package contains an HMAC software simulator for certificate plumbing, not hardware attestation.
 
-3. **Production Evaluation**: Comprehensive evaluation on production-scale system (500,000 embeddings, 47,000 queries) with 27.9-35.1 percentage point improvements over existing defenses under adaptive attacks
+3. **Explicit Evidence Boundary**: Archived Tier-1 production-scale results are kept separate from the reproducible 135-sample Tier-2 prompt-detector benchmark.
 
-4. **Deployment Framework**: Three operational modes enabling deployment across diverse organizational contexts and risk tolerances
+4. **Decision Modes**: Passive, gated, and active policies map the current correlation score to LOG, FLAG, ALLOW, or BLOCK; application-side review and fallback behavior are integration responsibilities.
 
 ## Architecture
 
 ![EmbedGuard cross-layer detection architecture](paper/images/figure_1.png)
 
 *A poisoned document planted in the corpus (red dashed path) is retrieved for a benign
-query (blue path). Each layer emits an anomaly signal; no single moderate signal crosses
-the block threshold, but the weighted fusion (ThreatScore = 1.225 ≥ 0.85) does — the
-query is blocked with a safe fallback. Figure source: [`paper/scripts/figure1_architecture.py`](paper/scripts/figure1_architecture.py);
+query (blue path). The current engine computes confidence-weighted consensus, applies a
+strongest-signal floor, adds a multi-layer correlation boost, and clips the final score
+to 1.0. In this illustrative case missing provenance evidence is already decisive, while
+retrieval and output signals corroborate it; active mode returns BLOCK. Figure source: [`paper/scripts/figure1_architecture.py`](paper/scripts/figure1_architecture.py);
 all figures regenerate via [`paper/scripts/generate_figures.py`](paper/scripts/generate_figures.py).*
 
 ### Detection flow
 
 ```
 user query ──► L1 prompt analysis ──────────────┐
-corpus doc ──► L2 embedding attestation (TEE) ──┤    ThreatScore = Σ βᵢ·sᵢ
-retrieval  ──► L3 distributional analysis ──────┼──► flag ≥ 0.70 · block ≥ 0.85
-LLM output ──► L4 consistency verification ─────┘    (passive / gated / active)
+corpus doc ──► L2 provenance simulator ─────────┤    score = clip(max(consensus,
+retrieval  ──► L3 distributional analysis ──────┼──► strongest) + correlation boost)
+LLM output ──► L4 consistency proxy ────────────┘    flag ≥ 0.70 · block ≥ 0.85
 ```
 
 ### Layer 1: Prompt Injection Detection
-- DistilBERT-based neural classifier
-- 87.3% detection accuracy with 4.2ms latency
-- Trained on 156,000 adversarial-benign query pairs
+- 83 regex signatures matched against original and normalized input
+- Unicode NFKC, zero-width-character removal, and whitespace-evasion handling
+- Open benchmark: 30/30 attacks detected, 0/105 benign queries flagged
 
 ### Layer 2: Cryptographic Embedding Attestation
-- TEE-based embedding generation with hardware isolation
-- Cryptographic signing of embedding provenance
-- 1.8ms signature generation, 0.3ms validation overhead
+- Target design: TEE-based embedding generation and hardware-rooted provenance
+- Released code: HMAC software simulation with document/model/vector binding
+- Tier-1 latency numbers require the unpublished hardware environment and are not reproduced here
 
 ![TEE-based embedding attestation protocol](paper/images/figure_2.png)
 
-*Ingestion: embeddings are generated inside the enclave, which signs H(document),
-H(model), the vector, timestamp, and platform measurements. Retrieval: certificates
-are verified before results are accepted; unverified embeddings are rejected.*
+*Target protocol: a measured SEV-SNP confidential VM binds document, approved-model, embedding, and timestamp
+hashes into the SEV-SNP `REPORT_DATA` field; a verifier checks the AMD endorsement chain,
+report signature, binding, launch measurement, policy, and TCB. The released simulator
+exercises only HMAC binding and verification, without an SNP report or endorsement chain.*
 
 ### Layer 3: Retrieval Distributional Analysis
-- Incremental PCA for similarity distribution monitoring
-- Kullback-Leibler divergence metrics (15.2ms per query)
-- Temporal rank correlation analysis
+- Bounded-window embedding PCA reconstruction-error monitoring
+- Regularized Mahalanobis distance against an evolving baseline
+- Temporal rank correlation after a ten-query warm-up
+- Experimental prototype; not exercised by the open Tier-2 benchmark
 
 ### Layer 4: Output Consistency Verification
-- Perturbation-based stability testing
-- 6.3ms latency for flagged queries
-- Semantic similarity measurement across perturbed sets
+- Document-set perturbations with deterministic synthetic-output generation
+- Optional caller-supplied generator callback for same-generator perturbation tests
+- Jaccard overlap by default; optional sentence-embedding similarity when explicitly enabled
+- Development proxy; real-output testing requires caller-controlled generator access
 
 ## Repository Structure
 
@@ -149,7 +157,7 @@ embedguard/
 │   ├── types.py                  # Type definitions
 │   ├── cli.py                    # Command-line interface
 │   ├── prompt_detector/          # Layer 1: Prompt injection detection
-│   ├── embedding_attestation/    # Layer 2: TEE-based attestation
+│   ├── embedding_attestation/    # Layer 2: HMAC provenance simulator
 │   ├── retrieval_analyzer/       # Layer 3: Distributional analysis
 │   ├── output_verifier/          # Layer 4: Consistency verification
 │   ├── correlation_engine/       # Threat signal fusion
@@ -196,10 +204,9 @@ Not yet published to PyPI; install from source as above.
 ### Dependencies
 
 - Python 3.10+
-- PyTorch 2.0+
-- Transformers 4.30+
-- Sentence-Transformers 2.2+
-- NumPy, SciPy, Pydantic, Loguru
+- NumPy, SciPy, scikit-learn, Pydantic, Loguru
+- Optional `neural` extra: PyTorch, Transformers, Sentence-Transformers
+- Optional `vector` extra: FAISS CPU
 
 ## Quick Start
 
@@ -235,7 +242,7 @@ print(f"Threat Level: {result.threat_level.value}")
 print(f"Decision: {result.decision.value}")
 
 if result.decision == Decision.BLOCK:
-    print("⚠️ Request blocked due to detected attack!")
+    print("⚠️ BLOCK returned; caller must stop processing or use a safe fallback")
     print(f"Detected attacks: {[a.value for a in result.detected_attacks]}")
 elif result.decision == Decision.FLAG:
     print("⚡ Request flagged for human review")
@@ -256,7 +263,8 @@ embedguard analyze "What is machine learning?" -d doc1.txt doc2.txt
 # JSON output for integration
 embedguard analyze "Query text" --output json --verbose
 
-# Run benchmark
+# Generate an optional synthetic CLI dataset, then run the CLI benchmark
+python scripts/generate_test_data.py --output test_data.json
 embedguard benchmark --dataset test_data.json --mode active
 ```
 
@@ -283,6 +291,9 @@ class SecureRAGPipeline:
         if result.decision == Decision.BLOCK:
             return "I cannot process this request."
 
+        if result.decision == Decision.FLAG:
+            return "Request held for human security review."
+
         # Generate response if safe
         return self.generator.generate(user_query, docs)
 ```
@@ -292,28 +303,26 @@ class SecureRAGPipeline:
 ### Passive Mode
 - All anomaly detections are logged without intervention
 - Returns `Decision.LOG` for all queries
-- Enables baseline understanding of threat landscape
-- 2.3-4.7 MB per incident for forensic analysis
+- Allows the caller to collect its own baseline and audit context
 
 ```python
 config = EmbedGuardConfig(mode=OperationalMode.PASSIVE)
 ```
 
 ### Gated Mode (Default)
-- High-confidence attacks (>0.70) flagged for manual review
+- High-confidence attacks (>=0.70) flagged for manual review
 - Returns `Decision.FLAG` when threat_score >= flag_threshold
-- Comprehensive context and visualization tools
-- 3-5 minutes average review time
+- The caller must hold or route flagged requests for review
 
 ```python
 config = EmbedGuardConfig(mode=OperationalMode.GATED)
 ```
 
 ### Active Mode
-- Automatic blocking for threats >0.85
+- Maps threats at or above 0.85 to a `Decision.BLOCK` result
 - Returns `Decision.BLOCK` when threat_score >= block_threshold
-- Safe fallback responses or retrieval-free generation
-- Production-ready with tunable thresholds
+- The caller is responsible for safe fallback behavior
+- Reference policy mapping; validate thresholds before deployment
 
 ```python
 config = EmbedGuardConfig(
@@ -345,7 +354,7 @@ config = EmbedGuardConfig(
 config = EmbedGuardConfig(
     layer_weights={
         "prompt": 0.35,     # Prompt injection layer
-        "embedding": 0.75,  # TEE attestation layer (highest)
+        "embedding": 0.75,  # Embedding provenance layer (highest)
         "retrieval": 0.50,  # Distributional analysis
         "output": 0.20,     # Output verification
     }
@@ -359,7 +368,7 @@ config = EmbedGuardConfig(
     enable_prompt_detection=True,
     enable_retrieval_analysis=True,
     enable_output_verification=False,  # Disable for lower latency
-    enable_tee=False,                  # Requires hardware support
+    enable_tee=False,                  # Software HMAC simulator is opt-in
 )
 ```
 
@@ -372,22 +381,16 @@ config = EmbedGuardConfig(
 ```
 
 This sets up a virtualenv, runs the unit test suite, and regenerates the
-benchmark report under `results/`. The committed
-`results/benchmark_report_20260125_005427.md` is the canonical run
-referenced by the paper. Note that the large-scale evaluation in the paper
-(500K embeddings, 47K queries) requires TEE hardware and a production corpus;
-`reproduce.sh` covers the detector benchmarks that run on commodity hardware.
+benchmark report and Wilson-interval analysis under `results/`. The committed
+`results/benchmark_report_20260710_025640.md` is the canonical v1.2.0 run
+referenced by manuscript v3.1. The large-scale evaluation reported in the paper
+(500K embeddings, 47K queries) is not packaged here: the production corpus,
+hardware-attestation logs, attack generator, and comparison outputs are unavailable.
+`reproduce.sh` covers only the detector regression benchmark on commodity hardware.
 
-### Comparative Performance
+### Archived Tier-1 Ablation Study
 
-| Defense System | Baseline Detection | Adaptive Detection | Latency |
-|----------------|--------------------|--------------------|----------|
-| **EmbedGuard** | **94.7%** | **89.3%** | 51ms |
-| RAGuard | 87.2% | 61.4% | 38ms |
-| RobustRAG | 82.9% | 58.7% | 42ms |
-| TrustRAG | 79.3% | 54.2% | 35ms |
-
-### Ablation Study
+These values are transcribed from the IJCESEN version of record and are not reproduced by `./reproduce.sh`.
 
 ![Cross-layer ablation](paper/images/figure_4.png)
 
@@ -400,9 +403,9 @@ referenced by the paper. Note that the large-scale evaluation in the paper
 | w/o Prompt Layer | 89.8% | -4.9pp |
 | Embedding Only (Best Single) | 76.3% | -18.4pp |
 
-## Applications
+## Potential Evaluation Contexts
 
-EmbedGuard is designed for high-assurance applications where RAG system integrity is critical:
+The architecture is motivated by integrity-sensitive RAG settings. The released prototype is not validated for clinical, financial, legal, or other high-assurance deployment:
 
 - **Healthcare**: Clinical decision support systems
 - **Financial Services**: Trading systems and risk assessment
@@ -416,14 +419,16 @@ If you use EmbedGuard in your research, please cite:
 ```bibtex
 @software{beshane_embedguard_2026,
   author = {Beshane, Neeraj Kumar Singh},
-  title = {{EmbedGuard: Cross-Layer Detection and Cryptographic Attestation for Secure Retrieval-Augmented Generation}},
+  title = {{EmbedGuard: Cross-Layer Detection and Provenance Attestation for Adversarial Embedding Attacks in RAG Systems}},
   year = {2026},
   doi = {10.5281/zenodo.18364919},
   url = {https://github.com/neerazz/embedguard},
-  version = {1.1.0},
+  version = {1.2.0},
   license = {MIT}
 }
 ```
+
+The peer-reviewed article uses the same title and is pinned by DOI `10.22399/ijcesen.4869`; the Zenodo concept DOI above resolves to the latest archived software release.
 
 ## License
 
@@ -431,10 +436,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Security Considerations
 
-- TEE implementation requires AMD SEV-SNP or Intel SGX hardware
-- Production deployment should follow security best practices
-- Regular updates recommended for detection model retraining
-- Consult documentation for hardening guidelines
+- The repository's provenance path is an HMAC simulator, not a TEE security boundary
+- The default detector is a fixed lexical pattern set, not a trained semantic classifier
+- Gated/active decisions have no effect unless the caller holds or blocks the request
+- Calibrate thresholds and test representative benign and adversarial traffic before any deployment
 
 ## Contributing
 
@@ -468,4 +473,4 @@ This research was conducted independently. The author thanks the security resear
 ---
 
 **Status**: Published in IJCESEN (DOI 10.22399/ijcesen.4869)
-**Version**: 1.1.0
+**Version:** 1.2.0 (manuscript v3.1; new archive DOI pending release)

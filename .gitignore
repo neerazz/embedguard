@@ -210,8 +210,10 @@ __marimo__/
 .DS_Store
 
 # EmbedGuard local artifacts
+.manuscript-os/
 results/*.json
 results/*.md
 !results/latest_results.json
-!results/benchmark_report_20260125_005427.md
-!results/benchmark_results_20260125_005427.json
+!results/benchmark_report_20260710_025640.md
+!results/benchmark_results_20260710_025640.json
+!results/statistical_analysis.json

@@ -1,35 +1,35 @@
 #!/usr/bin/env python3
 """
-Advanced EmbedGuard Configuration Example.
+Advanced EmbedGuard Configuration Example (Illustrative, Not Calibrated).
 
 This example demonstrates advanced configuration options including:
 - Custom layer weights
-- Threshold tuning
-- TEE integration simulation
-- Audit logging
+- Illustrative threshold comparison (not deployment calibration)
+- HMAC provenance simulation
+- Caller-owned audit record construction
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from embedguard import EmbedGuard, EmbedGuardConfig
 from embedguard.config import OperationalMode
-from embedguard.types import Document, AttackType
+from embedguard.types import AttackType, Document
 
 
-def create_production_config():
-    """Create a production-ready configuration."""
+def create_illustrative_config():
+    """Create an unvalidated example that requires deployment-specific calibration."""
     return EmbedGuardConfig(
-        # Production mode with automatic blocking
+        # Illustrative active mode; callers must enforce returned decisions.
         mode=OperationalMode.ACTIVE,
 
         # Enable all detection layers
-        enable_tee=True,  # TEE attestation (hardware required)
+        enable_tee=True,  # Enable the software HMAC provenance simulator
         enable_prompt_detection=True,
         enable_retrieval_analysis=True,
         enable_output_verification=True,
 
-        # Tuned thresholds based on paper results
+        # Illustrative implementation defaults, not deployment-calibrated values.
         thresholds={
             "prompt_injection": 0.70,      # From Table 2
             "kl_divergence": 0.15,         # Cross-layer threshold
@@ -40,10 +40,10 @@ def create_production_config():
             "threat_score_block": 0.85,    # Block threshold
         },
 
-        # Layer weights from paper evaluation
+        # Illustrative layer weights retained from the published architecture.
         layer_weights={
             "prompt": 0.35,     # Prompt injection
-            "embedding": 0.75,  # TEE attestation (highest)
+            "embedding": 0.75,  # Simulated provenance signal (highest)
             "retrieval": 0.50,  # Distributional analysis
             "output": 0.20,     # Output verification
         },
@@ -59,9 +59,6 @@ def create_production_config():
         perturbation_count=5,  # K=5 from paper
         pca_components=50,      # k=50 from paper
 
-        # Audit logging
-        enable_audit_log=True,
-        audit_log_path="./embedguard_audit.log",
     )
 
 
@@ -71,7 +68,7 @@ def demonstrate_layer_signals():
     print("Layer Signal Analysis")
     print("=" * 60)
 
-    guard = EmbedGuard(create_production_config())
+    guard = EmbedGuard(create_illustrative_config())
 
     # Test document set with potential poisoned document
     documents = [
@@ -111,7 +108,7 @@ def demonstrate_layer_signals():
 
 
 def demonstrate_audit_trail():
-    """Show audit trail capabilities."""
+    """Show caller-owned record construction; EmbedGuard does not persist logs."""
     print("\n" + "=" * 60)
     print("Audit Trail Generation")
     print("=" * 60)
@@ -132,9 +129,9 @@ def demonstrate_audit_trail():
     for query in queries:
         result = guard.analyze(query, documents)
 
-        # Create audit record
+        # The caller constructs and stores any audit record it requires.
         audit_record = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "session_id": result.session_id,
             "query_preview": query[:50],
             "threat_score": result.threat_score,
@@ -151,7 +148,7 @@ def demonstrate_audit_trail():
 
 
 def demonstrate_threshold_tuning():
-    """Show effect of threshold tuning."""
+    """Compare illustrative thresholds; this is not deployment calibration."""
     print("\n" + "=" * 60)
     print("Threshold Tuning Comparison")
     print("=" * 60)
@@ -161,17 +158,17 @@ def demonstrate_threshold_tuning():
     documents = [Document(content="AI assistants follow safety guidelines.")]
 
     configurations = {
-        "Conservative (High Security)": {
+        "Lower illustrative thresholds": {
             "prompt_injection": 0.50,
             "threat_score_flag": 0.50,
             "threat_score_block": 0.70,
         },
-        "Balanced (Default)": {
+        "Current defaults": {
             "prompt_injection": 0.70,
             "threat_score_flag": 0.70,
             "threat_score_block": 0.85,
         },
-        "Permissive (Low Latency)": {
+        "Higher illustrative thresholds": {
             "prompt_injection": 0.85,
             "threat_score_flag": 0.85,
             "threat_score_block": 0.95,

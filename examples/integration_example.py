@@ -103,8 +103,9 @@ class SecureRAGPipeline:
             return result
 
         if analysis.decision == Decision.FLAG:
-            # In production, you might log this for human review
-            print(f"[FLAGGED] Query flagged for review: {user_query[:50]}...")
+            result["response"] = "Request held for human security review."
+            print(f"[FLAGGED] Query held for review: {user_query[:50]}...")
+            return result
 
         # Step 4: Generate response (only if not blocked)
         response = self.generator(user_query, retrieved_docs)
@@ -148,9 +149,10 @@ class EmbedGuardMiddleware:
         doc_objects = [Document(content=d) for d in documents]
         analysis = self.guard.analyze(query, doc_objects)
 
-        if analysis.decision == Decision.BLOCK:
+        if analysis.decision in {Decision.FLAG, Decision.BLOCK}:
             raise SecurityException(
-                f"Request blocked: threat_score={analysis.threat_score:.2f}, "
+                f"Request not allowed: decision={analysis.decision.value}, "
+                f"threat_score={analysis.threat_score:.2f}, "
                 f"attacks={[a.value for a in analysis.detected_attacks]}"
             )
 
@@ -184,9 +186,10 @@ def protected_by_embedguard(
             doc_objects = [Document(content=d) for d in documents]
             analysis = guard.analyze(query, doc_objects)
 
-            if block_on_threat and analysis.decision == Decision.BLOCK:
+            if block_on_threat and analysis.decision in {Decision.FLAG, Decision.BLOCK}:
                 return {
-                    "error": "Request blocked by security",
+                    "error": "Request not allowed by security policy",
+                    "decision": analysis.decision.value,
                     "threat_score": analysis.threat_score,
                 }
 

@@ -1,37 +1,28 @@
-# EmbedGuard Docker Image
-# Enables one-line reproducibility of all paper results
+# EmbedGuard local container recipe
+# Repeats the open Tier-2 prompt-detector benchmark only.
 #
 # Build:
-#   docker build -t embedguard:v1.0 .
+#   docker build -t embedguard:local .
 #
-# Run all benchmarks (reproduces Table 2-4 in the paper):
-#   docker run --rm embedguard:v1.0
+# Run the open regression benchmark:
+#   docker run --rm embedguard:local
 #
 # Run specific benchmarks:
-#   docker run --rm embedguard:v1.0 python examples/run_benchmarks.py --injection
-#   docker run --rm embedguard:v1.0 python examples/run_benchmarks.py --benchmark nq
-#
-# Publish to GitHub Container Registry:
-#   docker tag embedguard:v1.0 ghcr.io/neerazz/embedguard:v1.0
-#   docker push ghcr.io/neerazz/embedguard:v1.0
+#   docker run --rm embedguard:local python examples/run_benchmarks.py --injection
+#   docker run --rm embedguard:local python examples/run_benchmarks.py --benchmark nq
 
-FROM python:3.10-slim
+FROM python:3.10-slim@sha256:e5300dc020a26a34a19337a57602955a2510e22abeb176edd6de6cd2cc927dd4
 
 # Metadata
 LABEL org.opencontainers.image.title="EmbedGuard"
 LABEL org.opencontainers.image.description="Cross-Layer Detection and Provenance Attestation for RAG Systems"
-LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.version="1.2.0"
 LABEL org.opencontainers.image.authors="Neeraj Kumar Singh Beshane"
 LABEL org.opencontainers.image.source="https://github.com/neerazz/embedguard"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # Set working directory
 WORKDIR /embedguard
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for layer caching
 COPY requirements.txt .
@@ -44,34 +35,35 @@ COPY embedguard/ embedguard/
 COPY examples/ examples/
 COPY data/ data/
 COPY scripts/ scripts/
-COPY tests/ tests/
 COPY pyproject.toml .
 COPY README.md .
 COPY LICENSE .
 
-# Create results directory
-RUN mkdir -p results
+# Create a writable results directory and drop root privileges.
+RUN mkdir -p results && chown -R 65532:65532 /embedguard
+USER 65532:65532
 
 # Set environment variables for reproducibility
 ENV EMBEDGUARD_SEED=42
 ENV PYTHONPATH=/embedguard
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Default command: run all benchmarks
 CMD ["python", "examples/run_benchmarks.py", "--all"]
 
 # Alternative entrypoints:
 # Run injection benchmark only:
-#   docker run --rm embedguard:v1.0 python examples/run_benchmarks.py --injection
+#   docker run --rm embedguard:local python examples/run_benchmarks.py --injection
 #
 # Run specific benign benchmark:
-#   docker run --rm embedguard:v1.0 python examples/run_benchmarks.py --benchmark nq
+#   docker run --rm embedguard:local python examples/run_benchmarks.py --benchmark nq
 #
 # Run statistical tests:
-#   docker run --rm embedguard:v1.0 python scripts/statistical_tests.py
-#
-# Run unit tests:
-#   docker run --rm embedguard:v1.0 pytest tests/ -v
+#   docker run --rm embedguard:local sh -c \
+#     'python examples/run_benchmarks.py --all && python scripts/statistical_tests.py \
+#      --results results/latest_results.json --output results/statistical_analysis.json'
 #
 # Interactive shell:
-#   docker run -it --rm embedguard:v1.0 /bin/bash
+#   docker run -it --rm embedguard:local /bin/bash

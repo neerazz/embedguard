@@ -38,6 +38,24 @@ class TestThreatCorrelationEngine:
         assert level == ThreatLevel.NONE
         assert decision == Decision.ALLOW
 
+    @pytest.mark.parametrize(
+        ("mode", "expected"),
+        [
+            (OperationalMode.PASSIVE, Decision.LOG),
+            (OperationalMode.GATED, Decision.ALLOW),
+            (OperationalMode.ACTIVE, Decision.ALLOW),
+        ],
+    )
+    def test_correlate_empty_signals_respects_operational_mode(
+        self, engine, mode, expected
+    ):
+        """Empty signals still pass through the operational decision policy."""
+        score, level, decision = engine.correlate({}, mode=mode)
+
+        assert score == 0.0
+        assert level == ThreatLevel.NONE
+        assert decision == expected
+
     def test_correlate_single_low_signal(self, engine):
         """Test correlation with single low signal."""
         signals = {
@@ -110,6 +128,30 @@ class TestThreatCorrelationEngine:
 
         # Multi-layer should have correlation boost
         assert score_multi >= score_single
+
+    def test_zero_confidence_signals_cannot_create_correlation_boost(self, engine):
+        signals = {
+            "prompt": LayerSignal(
+                layer_name="prompt", score=0.69, confidence=1.0
+            ),
+            "embedding": LayerSignal(
+                layer_name="embedding", score=1.0, confidence=0.0
+            ),
+            "retrieval": LayerSignal(
+                layer_name="retrieval", score=1.0, confidence=0.0
+            ),
+            "output": LayerSignal(
+                layer_name="output", score=1.0, confidence=0.0
+            ),
+        }
+
+        score, _, decision = engine.correlate(
+            signals,
+            mode=OperationalMode.ACTIVE,
+        )
+
+        assert score == pytest.approx(0.69)
+        assert decision == Decision.ALLOW
 
     def test_decision_passive_mode(self, engine):
         """Test that passive mode always logs."""

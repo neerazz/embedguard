@@ -4,14 +4,13 @@
 
 - **Python**: 3.10 or higher
 - **Operating System**: Linux, macOS, or Windows
-- **Memory**: 4GB RAM minimum (8GB recommended)
-- **Disk Space**: 500MB for installation
+- **Memory/Disk**: depend on optional ML models; the default pattern path does not download a checkpoint
 
 ## Installation Methods
 
 ### Method 1: Docker (Recommended for Reproducibility)
 
-The easiest way to run EmbedGuard with all dependencies:
+The easiest way to run the model-free core and Tier-2 benchmark dependencies:
 
 ```bash
 # Build the image locally from the included Dockerfile
@@ -37,11 +36,8 @@ cd embedguard
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Install package in development mode
-pip install -e .
+# Install the package and development tools
+pip install -e '.[dev]'
 
 # Verify installation
 python -c "import embedguard; print('EmbedGuard installed successfully')"
@@ -49,25 +45,31 @@ python -c "import embedguard; print('EmbedGuard installed successfully')"
 
 ### Method 3: Direct Installation
 
+`requirements.txt` contains the core runtime set for environments that do not install from `pyproject.toml`:
+
 ```bash
 pip install -r requirements.txt
+pip install -e . --no-deps
 ```
 
 ## Dependencies
 
-Core dependencies (from `requirements.txt`):
+Core package dependencies:
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| torch | >=2.0.0 | Deep learning framework |
-| transformers | >=4.30.0 | NLP models |
-| sentence-transformers | >=2.2.0 | Embedding generation |
 | numpy | >=1.24.0 | Numerical computing |
 | scipy | >=1.10.0 | Scientific computing |
 | scikit-learn | >=1.3.0 | Machine learning utilities |
-| faiss-cpu | >=1.7.4 | Vector similarity search |
 | pydantic | >=2.0.0 | Data validation |
 | loguru | >=0.7.0 | Logging |
+
+Optional model paths are explicit extras; the default install performs no model download:
+
+```bash
+pip install -e '.[neural]'  # PyTorch, Transformers, Sentence-Transformers
+pip install -e '.[vector]'  # FAISS CPU
+```
 
 ## Verifying Installation
 
@@ -86,9 +88,9 @@ print(f'Installation verified! Decision: {result.decision.value}')
 "
 ```
 
-## Running Benchmarks
+## Running the Open Tier-2 Regression Benchmark
 
-To reproduce the paper results:
+To repeat the open 135-sample prompt-detector observations (not the Tier-1 paper results):
 
 ```bash
 # Full benchmark suite
@@ -96,15 +98,15 @@ python examples/run_benchmarks.py --all
 
 # Individual benchmarks
 python examples/run_benchmarks.py --injection
-python examples/run_benchmarks.py --nq
-python examples/run_benchmarks.py --hotpotqa
-python examples/run_benchmarks.py --msmarco
+python examples/run_benchmarks.py --benchmark nq
+python examples/run_benchmarks.py --benchmark hotpotqa
+python examples/run_benchmarks.py --benchmark msmarco
 ```
 
-Expected output:
+Expected classification counts for the committed inputs:
 - Detection Rate: 100% (30/30 attacks)
 - False Positive Rate: 0% (0/105 benign)
-- Mean Latency: ~0.05ms
+- Latency: host-dependent; inspect the generated JSON
 
 ## Troubleshooting
 
@@ -124,10 +126,6 @@ Expected output:
 - GitHub Issues: https://github.com/neerazz/embedguard/issues
 - Documentation: See `docs/USAGE.md` for detailed usage guide
 
-## Hardware Requirements for TEE
+## Hardware-Attestation Status
 
-The TEE (Trusted Execution Environment) layer requires:
-- AMD SEV-SNP compatible processor, OR
-- Intel SGX compatible processor
-
-Without TEE hardware, EmbedGuard runs in software simulation mode (default).
+The released package does not integrate with AMD SEV-SNP or Intel SGX hardware. `EmbeddingAttestationLayer` is an HMAC software simulator for development and certificate-plumbing tests. Implementing the target hardware-rooted protocol requires a separate attestation client, endorsement-chain verification, freshness/nonces, and platform-policy validation; installing this package on a TEE-capable host does not add those controls automatically.

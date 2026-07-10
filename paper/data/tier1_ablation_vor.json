@@ -1,0 +1,41 @@
+{
+  "artifact": "EmbedGuard Tier-1 ablation transcription",
+  "evidence_class": "version-of-record transcription",
+  "source": {
+    "title": "EmbedGuard: Cross-Layer Detection and Provenance Attestation for Adversarial Embedding Attacks in RAG Systems",
+    "doi": "10.22399/ijcesen.4869",
+    "section": "4.1"
+  },
+  "metric": "detection_rate_percent",
+  "rows": [
+    {
+      "label": "Full system (4 layers)",
+      "detection_rate_percent": 94.7
+    },
+    {
+      "label": "w/o output layer",
+      "detection_rate_percent": 91.2
+    },
+    {
+      "label": "w/o prompt layer",
+      "detection_rate_percent": 89.8
+    },
+    {
+      "label": "w/o retrieval layer",
+      "detection_rate_percent": 87.4
+    },
+    {
+      "label": "w/o embedding TEE",
+      "detection_rate_percent": 84.6
+    },
+    {
+      "label": "Embedding only (best single layer)",
+      "detection_rate_percent": 76.3
+    }
+  ],
+  "comparison": {
+    "full_minus_best_single_layer_percentage_points": 18.4,
+    "interpretation": "Archived full-system versus best-single-layer comparison; not causal isolation of the correlation mechanism."
+  },
+  "limitations": "The open repository does not contain Tier-1 sample counts, confidence intervals, raw observations, corpus, hardware evidence, or an executable cross-layer ablation."
+}

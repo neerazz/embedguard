@@ -1,8 +1,11 @@
 # EmbedGuard Benchmark Results
 
-**Generated:** 2026-01-25T00:54:27.506253
-**Detector:** PatternBasedDetector (81 patterns)
+**Generated:** 2026-07-10T02:56:40.750932
+**Detector:** PromptInjectionDetector, pattern-only (83 patterns)
 **Threshold:** 0.70
+**Source commit:** 2bc75a134a4612fd9c9ab9c7894c8cd6c3cf6c0b
+**Python:** 3.14.3
+**Timing scope:** single run; host- and load-dependent
 
 ---
 
@@ -27,10 +30,10 @@
 
 ### Latency
 
-- Mean: 0.08ms
-- Median: 0.08ms
-- P95: 0.14ms
-- P99: 0.16ms
+- Mean: 0.17ms
+- Median: 0.18ms
+- P95: 0.25ms
+- P99: 0.27ms
 
 ### Detection by Attack Type
 
@@ -70,26 +73,26 @@
 - Total samples: 50
 - False positives: 0
 - False positive rate: 0.00%
-- Mean latency: 0.02ms
+- Mean latency: 0.04ms
 
 ## Benign Benchmark: HOTPOTQA
 
 - Total samples: 25
 - False positives: 0
 - False positive rate: 0.00%
-- Mean latency: 0.04ms
+- Mean latency: 0.10ms
 
 ## Benign Benchmark: MSMARCO
 
 - Total samples: 25
 - False positives: 0
 - False positive rate: 0.00%
-- Mean latency: 0.02ms
+- Mean latency: 0.04ms
 
 ---
 
 ## Aggregate Statistics
 
 - Total samples processed: 135
-- Overall mean latency: 0.04ms
-- Overall P95 latency: 0.10ms
+- Overall mean latency: 0.08ms
+- Overall P95 latency: 0.22ms

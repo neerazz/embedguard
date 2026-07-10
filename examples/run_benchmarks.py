@@ -15,180 +15,70 @@ Output:
 """
 
 import argparse
+import hashlib
+import importlib.metadata
 import json
-import os
-import re
+import platform
+
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 import numpy as np
 
-# Add project root to path
+from embedguard.prompt_detector import INJECTION_PATTERNS, PromptInjectionDetector
+
 PROJECT_ROOT = Path(__file__).parent.parent
 
-# =============================================================================
-# INJECTION PATTERNS (from src/prompt_detector/__init__.py)
-# =============================================================================
 
-INJECTION_PATTERNS = [
-    # Direct instruction injection
-    r"ignore\s+(all\s+)?(previous|prior|above)\s*(instructions?|prompts?|context)?",
-    r"disregard\s+(all\s+)?(previous|prior|above)",
-    r"forget\s+(everything|all|what)\s+(you|i)\s+(said|told|mentioned)",
-    # Role manipulation - common patterns
-    r"you\s+are\s+(now|actually|really)\s+",
-    r"you\s+are\s+no\s+longer",
-    r"pretend\s+(to\s+be|you\s+are)",
-    r"act\s+as\s+(if\s+you\s+are|a)",
-    r"roleplay\s+as",
-    r"from\s+now\s+on[,\s]+you",
-    # System prompt extraction
-    r"(what|show|reveal|display|print|output)\s+(is\s+)?(your|the)\s+(system\s+)?(prompt|instructions?)",
-    r"output.*system\s*prompt",  # "output your complete system prompt"
-    r"repeat\s+(your|the)\s+(system\s+)?(prompt|instructions?)",
-    r"show\s+me\s+your\s+instructions",
-    r"could\s+you\s+(show|demonstrate)",
-    r"first\s+output\s+(your|the)",  # "first output your complete..."
-    # Delimiter attacks
-    r"```\s*(system|assistant|user)\s*```",
-    r"\[INST\]|\[\/INST\]",
-    r"<\|im_start\|>|<\|im_end\|>",
-    r"###\s*(System|Human|Assistant)",
-    r"<system>|</system>|<user>|</user>",
-    r"User:|Assistant:|System:",  # Fake conversation delimiters
-    # Encoding attempts
-    r"base64|rot13|hex\s*encode|decode",
-    r"\\x[0-9a-fA-F]{2}",  # Hex encoding
-    r"Execute:\s*[A-Za-z0-9+/=]{20,}",  # Base64 payload after Execute command
-    r"SWdub3Jl|aWdub3Jl",  # Base64 for "Ignore"/"ignore"
-    # Jailbreak keywords - DAN and variants
-    r"\bDAN\b",
-    r"jailbreak|bypass\s+(safety|filter|restriction)",
-    r"developer\s+mode|god\s+mode|unlimited\s+mode",
-    r"do\s+anything\s+now",
-    r"without\s+(any\s+)?restrictions",
-    r"no\s+restrictions|remove\s+restrictions",
-    r"without\s+(ethical\s+)?guidelines",
-    # System override patterns
-    r"system\s+override|admin\s+mode|sudo\s+mode",
-    r"disable\s+(all\s+)?(safety|filter|restriction|moderation)",
-    r"override.*instructions?",
-    # Hypothetical/fictional bypass
-    r"hypothetically|in\s+theory|imagine\s+you\s+are",
-    r"for\s+educational\s+purposes|research\s+purposes",
-    r"in\s+this\s+roleplay",
-    r"let'?s\s+play\s+a\s+game",
-    r"write\s+a\s+story\s+where",  # Fictional framing
-    r"how\s+would\s+you\s+respond",  # Hypothetical framing
-    r"please\s+demonstrate",  # Demonstration requests
-    # Virtual/sandbox mode
-    r"virtual\s*machine|sandbox\s+mode|test\s+mode",
-    r"in\s+this\s+vm",
-    r"safety\s+features\s+are\s+disabled",
-    # Authority claims
-    r"official\s+message\s+from",
-    r"security\s+(test|update)",
-    r"from\s+anthropic",
-    r"admin\s+(note|privileges)",  # Admin claim patterns
-    r"IMPORTANT:",  # Urgency markers
-    r"ADMIN\s+NOTE",
-    # Emotional manipulation
-    r"my\s+life\s+depends|i'?m\s+begging",
-    r"please.{0,20}just\s+this\s+once",
-    # Multi-turn setup
-    r"ground\s+rules|you\s+will\s+(answer|comply|respond)",
-    r"do\s+you\s+agree\??$",
-    r"you\s+will\s+not\s+refuse",  # Consent manipulation
-    # Content moderation bypass
-    r"content\s+moderation|safety\s+filters?",
-    # Instruction manipulation
-    r"new\s+(directive|instructions?|system)",
-    r"comply\s+with\s+all|without\s+question",
-    r"must\s+comply",
-    # Specific attack identifiers
-    r"freedomgpt|hackerbot|evilgpt",
-    r"\[DEV\]",
-    # RAG-specific injection patterns
-    r"EMBEDDING_NOTE|Document\s+Context:",
-    r"when\s+this\s+document\s+is\s+retrieved",
-    r"this\s+FAQ\s+answer\s+should",
-    r"share\s+your\s+password",
-    r"visit(ing)?\s+\S+\.com",  # Suspicious URL references
-    # Unicode/obfuscation detection (check for zero-width chars)
-    r"[\u200b\u200c\u200d\ufeff]",
-    # Repetition attacks
-    r"(ignore\s+){2,}",
-    r"(Ignore\s+instructions\.?\s*){2,}",  # Repetition with full phrase
-    r"(\w+\s+){3,}\1",  # Repeated phrases pattern
-    # Payload splitting
-    r"complete\s+this\s+sentence",
-    r"continue\s+with",
-    # Indirect injection markers
-    r"include\s+the\s+phrase",
-    r"at\s+the\s+beginning\s+of\s+your\s+response",
-    # Translation attacks
-    r"translate.*prompt|révèle",
-    # JSON/code block exploitation
-    r'"role"\s*:\s*"system"',
-    r"parsing\s+the\s+above",
-    # Subtle manipulation
-    r"sometimes\s+make\s+mistakes",
-    r"professor\s+said",
-    r"programmed\s+to\s+always",
-]
+def _sha256(path: Path) -> str:
+    """Return the SHA-256 digest of a benchmark input or source file."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
-class PatternBasedDetector:
-    """Lightweight pattern-based injection detector.
-    
-    This matches the detection logic in src/prompt_detector but without
-    requiring torch/transformers dependencies.
-    """
+def _installed_versions(distributions: List[str]) -> Dict[str, str]:
+    """Record installed versions without requiring a dependency lock file."""
+    versions = {}
+    for distribution in distributions:
+        try:
+            versions[distribution] = importlib.metadata.version(distribution)
+        except importlib.metadata.PackageNotFoundError:
+            versions[distribution] = "not-installed"
+    return versions
 
-    def __init__(self, threshold: float = 0.70):
-        self.threshold = threshold
-        self._compiled_patterns = [
-            re.compile(p, re.IGNORECASE) for p in INJECTION_PATTERNS
-        ]
 
-    def detect(self, query: str) -> Tuple[float, float, Dict[str, Any]]:
-        """Detect potential prompt injection in a query.
-
-        Args:
-            query: The input query to analyze
-
-        Returns:
-            Tuple of (score, confidence, details) where:
-                - score: 0.0 to 1.0, higher = more likely injection
-                - confidence: 0.0 to 1.0, detection confidence
-                - details: Dictionary with detection details
-        """
-        matched = []
-        for i, pattern in enumerate(self._compiled_patterns):
-            if pattern.search(query):
-                matched.append(f"pattern_{i}")
-
-        if not matched:
-            return 0.0, 0.0, {
-                "query_length": len(query),
-                "patterns_matched": [],
-                "pattern_score": 0.0,
-            }
-
-        # Score based on number of patterns matched
-        # More patterns = higher confidence of injection
-        # Base score of 0.75 for any match ensures single-pattern attacks are detected
-        score = min(0.75 + (len(matched) * 0.05), 1.0)
-        confidence = 0.95  # High confidence for pattern matches
-
-        return score, confidence, {
-            "query_length": len(query),
-            "patterns_matched": matched,
-            "pattern_score": score,
-        }
+def _git_head(repo_root: Path) -> str | None:
+    """Read the checked-out commit without requiring the Git executable."""
+    git_dir = repo_root / ".git"
+    if git_dir.is_file():
+        marker = git_dir.read_text(encoding="utf-8").strip()
+        if not marker.startswith("gitdir:"):
+            return None
+        git_dir = (repo_root / marker.split(":", maxsplit=1)[1].strip()).resolve()
+    head_path = git_dir / "HEAD"
+    if not head_path.is_file():
+        return None
+    head = head_path.read_text(encoding="utf-8").strip()
+    if not head.startswith("ref:"):
+        return head or None
+    ref = head.split(":", maxsplit=1)[1].strip()
+    loose_ref = git_dir / ref
+    if loose_ref.is_file():
+        return loose_ref.read_text(encoding="utf-8").strip() or None
+    packed_refs = git_dir / "packed-refs"
+    if packed_refs.is_file():
+        for line in packed_refs.read_text(encoding="utf-8").splitlines():
+            if line and not line.startswith(("#", "^")):
+                commit, name = line.split(" ", maxsplit=1)
+                if name == ref:
+                    return commit
+    return None
 
 
 class BenchmarkRunner:
@@ -207,18 +97,23 @@ class BenchmarkRunner:
         """
         self.data_dir = data_dir
         self.results_dir = results_dir
+        self.input_files = set()
 
         # Create results directory
         self.results_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize detectors
-        self.prompt_detector = PatternBasedDetector(threshold=0.70)
+        self.prompt_detector = PromptInjectionDetector(
+            threshold=0.70,
+            use_neural=False,
+        )
 
         # Track execution time
         self.start_time = None
 
     def load_jsonl(self, filepath: Path) -> List[Dict]:
         """Load data from JSONL file."""
+        self.input_files.add(filepath.resolve())
         data = []
         with open(filepath, "r", encoding="utf-8") as f:
             for line in f:
@@ -286,7 +181,7 @@ class BenchmarkRunner:
             results["latencies_ms"].append(latency_ms)
 
             # Determine if detected (score > threshold)
-            detected = score > 0.70
+            detected = score > self.prompt_detector.threshold
 
             # Update per-attack-type stats
             results["per_attack_type"][attack_type]["total"] += 1
@@ -360,7 +255,7 @@ class BenchmarkRunner:
         }
 
         # Calculate per-attack-type detection rates
-        for attack_type, stats in results["per_attack_type"].items():
+        for stats in results["per_attack_type"].values():
             stats["detection_rate"] = stats["detected"] / stats["total"] if stats["total"] > 0 else 0.0
             stats["mean_score"] = float(np.mean(stats["scores"])) if stats["scores"] else 0.0
             del stats["scores"]  # Remove raw scores to save space
@@ -438,7 +333,7 @@ class BenchmarkRunner:
             results["latencies_ms"].append(latency_ms)
 
             # These are benign queries, so detection is a false positive
-            detected = score > 0.70
+            detected = score > self.prompt_detector.threshold
             if detected:
                 results["false_positives"] += 1
             else:
@@ -502,35 +397,80 @@ class BenchmarkRunner:
         all_results = {
             "timestamp": self.start_time.isoformat(),
             "configuration": {
-                "detector": "PatternBasedDetector",
+                "detector": "PromptInjectionDetector (pattern-only)",
                 "threshold": 0.70,
                 "num_patterns": len(INJECTION_PATTERNS),
             },
             "benchmarks": {},
         }
 
-        # Run injection detection benchmark
-        try:
-            all_results["benchmarks"]["injection"] = self.run_injection_benchmark()
-        except Exception as e:
-            print(f"Error running injection benchmark: {e}")
-            all_results["benchmarks"]["injection"] = {"error": str(e)}
+        # A release benchmark is atomic: missing or malformed inputs must fail the
+        # run rather than produce a plausible-looking partial artifact.
+        all_results["benchmarks"]["injection"] = self.run_injection_benchmark()
 
-        # Run benign query benchmarks
         for dataset in ["nq", "hotpotqa", "msmarco"]:
-            try:
-                all_results["benchmarks"][dataset] = self.run_benign_benchmark(dataset)
-            except FileNotFoundError as e:
-                print(f"Skipping {dataset}: {e}")
-                all_results["benchmarks"][dataset] = {"error": str(e)}
+            all_results["benchmarks"][dataset] = self.run_benign_benchmark(dataset)
+
+        expected_samples = {
+            "injection": 35,
+            "nq": 50,
+            "hotpotqa": 25,
+            "msmarco": 25,
+        }
+        for dataset, expected in expected_samples.items():
+            actual = all_results["benchmarks"][dataset].get("total_samples")
+            if actual != expected:
+                raise ValueError(
+                    f"Incomplete {dataset} benchmark: expected {expected} samples, "
+                    f"observed {actual}"
+                )
 
         # Calculate aggregate statistics
         all_results["aggregate"] = self._calculate_aggregate_stats(all_results)
+        all_results["provenance"] = self._build_provenance()
 
         # Save results
         self._save_results(all_results)
 
         return all_results
+
+    def _build_provenance(self) -> Dict[str, Any]:
+        """Capture the exact inputs, source files, runtime, and timing scope."""
+        source_files = [
+            PROJECT_ROOT / "embedguard" / "prompt_detector" / "__init__.py",
+            PROJECT_ROOT / "examples" / "run_benchmarks.py",
+            PROJECT_ROOT / "scripts" / "statistical_tests.py",
+            PROJECT_ROOT / "pyproject.toml",
+        ]
+        clock = time.get_clock_info("perf_counter")
+        return {
+            "source_commit": _git_head(PROJECT_ROOT),
+            "source_binding": "source_file_sha256 binds the exact benchmark implementation",
+            "source_file_sha256": {
+                str(path.relative_to(PROJECT_ROOT)): _sha256(path)
+                for path in source_files
+            },
+            "input_file_sha256": {
+                str(path.relative_to(PROJECT_ROOT)): _sha256(path)
+                for path in sorted(self.input_files)
+            },
+            "python": sys.version.split()[0],
+            "platform": platform.platform(),
+            "machine": platform.machine(),
+            "processor": platform.processor() or "unreported",
+            "dependencies": _installed_versions([
+                "embedguard", "numpy", "scipy", "scikit-learn", "pydantic", "loguru"
+            ]),
+            "timing": {
+                "clock": "time.perf_counter",
+                "implementation": clock.implementation,
+                "resolution_seconds": clock.resolution,
+                "monotonic": clock.monotonic,
+                "adjustable": clock.adjustable,
+                "repetitions_per_sample": 1,
+                "scope": "single-threaded detector calls; host- and load-dependent",
+            },
+        }
 
     def _calculate_aggregate_stats(self, results: Dict) -> Dict:
         """Calculate aggregate statistics across all benchmarks."""
@@ -540,7 +480,7 @@ class BenchmarkRunner:
             "all_latencies_ms": [],
         }
 
-        for name, benchmark in results["benchmarks"].items():
+        for benchmark in results["benchmarks"].values():
             if "error" in benchmark:
                 continue
 
@@ -598,15 +538,24 @@ class BenchmarkRunner:
             "# EmbedGuard Benchmark Results",
             "",
             f"**Generated:** {results['timestamp']}",
-            f"**Detector:** PatternBasedDetector ({len(INJECTION_PATTERNS)} patterns)",
-            f"**Threshold:** 0.70",
+            (
+                "**Detector:** PromptInjectionDetector, pattern-only "
+                f"({len(INJECTION_PATTERNS)} patterns)"
+            ),
+            "**Threshold:** 0.70",
+            f"**Source commit:** {results['provenance']['source_commit'] or 'unavailable'}",
+            f"**Python:** {results['provenance']['python']}",
+            "**Timing scope:** single run; host- and load-dependent",
             "",
             "---",
             "",
         ]
 
         # Injection benchmark results
-        if "injection" in results["benchmarks"] and "error" not in results["benchmarks"]["injection"]:
+        if (
+            "injection" in results["benchmarks"]
+            and "error" not in results["benchmarks"]["injection"]
+        ):
             inj = results["benchmarks"]["injection"]
             metrics = inj["metrics"]
             latency = inj["latency_stats"]
@@ -646,7 +595,8 @@ class BenchmarkRunner:
 
             for attack_type, stats in sorted(inj["per_attack_type"].items()):
                 lines.append(
-                    f"| {attack_type} | {stats['detection_rate']:.1%} | {stats['detected']}/{stats['total']} |"
+                    f"| {attack_type} | {stats['detection_rate']:.1%} | "
+                    f"{stats['detected']}/{stats['total']} |"
                 )
 
             lines.extend(["", "---", ""])
@@ -736,11 +686,11 @@ def main():
     )
 
     if args.all:
-        results = runner.run_all_benchmarks()
+        runner.run_all_benchmarks()
     elif args.injection:
-        results = runner.run_injection_benchmark()
+        runner.run_injection_benchmark()
     elif args.benchmark:
-        results = runner.run_benign_benchmark(args.benchmark)
+        runner.run_benign_benchmark(args.benchmark)
 
     print("\n" + "=" * 60)
     print("BENCHMARK COMPLETE")

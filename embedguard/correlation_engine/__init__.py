@@ -43,7 +43,7 @@ class ThreatCorrelationEngine:
     # Default layer weights from paper
     DEFAULT_WEIGHTS = {
         "prompt": 0.35,      # Prompt injection detection
-        "embedding": 0.75,   # TEE attestation (highest weight)
+        "embedding": 0.75,   # Embedding provenance (highest weight)
         "retrieval": 0.50,   # Distributional analysis
         "output": 0.20,      # Output verification
     }
@@ -97,7 +97,7 @@ class ThreatCorrelationEngine:
             Tuple of (threat_score, threat_level, decision)
         """
         if not layer_signals:
-            return 0.0, ThreatLevel.NONE, Decision.ALLOW
+            return 0.0, ThreatLevel.NONE, self._make_decision(0.0, mode)
 
         # Compute base threat score
         threat_score = self._compute_threat_score(layer_signals)
@@ -159,10 +159,11 @@ class ThreatCorrelationEngine:
         The paper notes that coordinated attacks across multiple layers
         are stronger indicators than single-layer anomalies.
         """
-        # Count layers with elevated scores
+        # Count only confidence-bearing elevated signals. Raw high scores with
+        # zero confidence must not manufacture a coordinated-attack boost.
         elevated_count = sum(
             1 for signal in layer_signals.values()
-            if signal.score > 0.5
+            if signal.score * signal.confidence > 0.5
         )
 
         # No boost for single layer
@@ -244,7 +245,7 @@ class ThreatCorrelationEngine:
                 "confidence": signal.confidence,
                 "weighted_score": signal.weighted_score,
             }
-            if signal.score > 0.5:
+            if signal.score * signal.confidence > 0.5:
                 analysis["affected_layers"].append(name)
 
         # Identify primary attack vector (highest weighted score)

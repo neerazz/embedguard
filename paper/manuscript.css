@@ -1,0 +1,157 @@
+@page {
+  size: Letter;
+  margin: 0.55in 0.55in 0.62in;
+}
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 10pt;
+}
+
+body {
+  max-width: 7.4in;
+  margin: 0 auto;
+  color: #171724;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  line-height: 1.42;
+}
+
+h1, h2, h3, h4 {
+  color: #16162a;
+  line-height: 1.16;
+  break-after: avoid-page;
+  page-break-after: avoid;
+}
+
+h1 {
+  font-size: 19pt;
+  margin: 0 0 0.22in;
+}
+
+h2 {
+  margin-top: 0.25in;
+  padding-bottom: 0.04in;
+  border-bottom: 0.6pt solid #c8cbd2;
+  font-size: 14pt;
+}
+
+h3 { font-size: 11.5pt; }
+h4 { font-size: 10.5pt; }
+
+p, li {
+  orphans: 3;
+  widows: 3;
+}
+
+a {
+  color: #194f8c;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.12in auto 0.08in;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+p:has(> img) {
+  margin-bottom: 0;
+  break-after: avoid-page;
+  page-break-after: avoid;
+}
+
+p:has(> img) + p {
+  break-before: avoid-page;
+  page-break-before: avoid;
+}
+
+figure, blockquote, pre {
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+table {
+  width: 100%;
+  margin: 0.11in 0 0.16in;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 7.4pt;
+  line-height: 1.22;
+}
+
+.table-caption {
+  break-after: avoid-page;
+  page-break-after: avoid;
+}
+
+.table-caption + table {
+  break-before: avoid-page;
+  page-break-before: avoid;
+}
+
+.keep-with-next {
+  break-after: avoid-page;
+  page-break-after: avoid;
+}
+
+.keep-with-next + p {
+  break-before: avoid-page;
+  page-break-before: avoid;
+}
+
+thead {
+  display: table-header-group;
+}
+
+tr {
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+th, td {
+  border: 0.5pt solid #aeb3bd;
+  padding: 3.2pt 4pt;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+th {
+  background: #edf1f5;
+  font-weight: 650;
+}
+
+code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.88em;
+  overflow-wrap: anywhere;
+}
+
+pre {
+  padding: 7pt;
+  border: 0.5pt solid #c7cbd2;
+  background: #f6f7f9;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+hr {
+  margin: 0.22in 0;
+  border: 0;
+  border-top: 0.6pt solid #c8cbd2;
+}
+
+@media print {
+  body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}

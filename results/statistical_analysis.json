@@ -1,0 +1,15 @@
+{
+  "attack_samples": 30,
+  "benign_samples": 105,
+  "detection_rate": 1.0,
+  "specificity": 1.0,
+  "detection_rate_ci_95": [
+    0.8864866068260312,
+    0.9999999999999999
+  ],
+  "specificity_ci_95": [
+    0.9647059230708901,
+    1.0
+  ],
+  "method": "Two-sided 95% Wilson score intervals over observed counts"
+}

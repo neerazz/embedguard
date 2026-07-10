@@ -5,14 +5,19 @@ Design brief (modeled on PoisonedRAG Fig.1 / RevPRAG-class figures):
 - Concrete running example woven through the figure, not abstract boxes.
 - Two contrasting paths: benign query (blue) and poisoned document (red).
 - Each detection layer shows its check AND the signal it emits for the
-  worked example from Section 3.6 (0.1, 1.0, 0.8, 0.7 -> ThreatScore 1.225).
-- Correlation engine shows the actual fusion arithmetic ending in BLOCK.
+  worked example from Section 3.6 (0.1, 1.0, 0.8, 0.7).
+- Correlation engine shows the package's consensus/floor/boost logic ending in BLOCK.
 """
 
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Circle
+from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch
+
+from embedguard.config import OperationalMode
+from embedguard.correlation_engine import ThreatCorrelationEngine
+from embedguard.prompt_detector import INJECTION_PATTERNS
+from embedguard.types import LayerSignal
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "paper" / "images"
@@ -36,6 +41,48 @@ GREEN = "#2e7d4f"
 GREEN_BG = "#e6f2ea"
 AMBER = "#b07f2e"
 AMBER_BG = "#fdf3e0"
+PATTERN_COUNT = len(INJECTION_PATTERNS)
+
+
+def compute_example_details():
+    """Derive every displayed value from the package's current fusion logic."""
+    signals = {
+        "prompt": LayerSignal("prompt", 0.1, 1.0),
+        "embedding": LayerSignal("embedding", 1.0, 1.0),
+        "retrieval": LayerSignal("retrieval", 0.8, 1.0),
+        "output": LayerSignal("output", 0.7, 1.0),
+    }
+    engine = ThreatCorrelationEngine()
+    weighted_sum = sum(
+        signal.score * signal.confidence * engine.layer_weights[name]
+        for name, signal in signals.items()
+    )
+    weight_total = sum(
+        signal.confidence * engine.layer_weights[name]
+        for name, signal in signals.items()
+    )
+    consensus = weighted_sum / weight_total
+    strongest = max(signal.score * signal.confidence for signal in signals.values())
+    boost = engine._compute_correlation_factor(signals)
+    score, _level, decision = engine.correlate(
+        signals,
+        mode=OperationalMode.ACTIVE,
+    )
+    return {
+        "boost": boost,
+        "consensus": consensus,
+        "decision": decision,
+        "score": score,
+        "strongest": strongest,
+        "weight_total": weight_total,
+        "weighted_sum": weighted_sum,
+    }
+
+
+def compute_example_decision():
+    """Return the figure's final score and decision for integrity tests."""
+    details = compute_example_details()
+    return details["score"], details["decision"]
 
 
 def box(ax, x, y, w, h, fc, ec=INK, lw=1.0, r=0.02):
@@ -44,7 +91,7 @@ def box(ax, x, y, w, h, fc, ec=INK, lw=1.0, r=0.02):
                                 fc=fc, ec=ec, lw=lw))
 
 
-def txt(ax, x, y, s, size=8, color=INK, ha="center", va="center", weight="normal",
+def txt(ax, x, y, s, size: float = 8, color=INK, ha="center", va="center", weight="normal",
         style="normal", ls=1.3):
     ax.text(x, y, s, fontsize=size, color=color, ha=ha, va=va,
             fontweight=weight, style=style, linespacing=ls)
@@ -74,10 +121,23 @@ def doc_card(ax, x, y, w, h, fc, ec, lines, lw=0.9, fold=0.14):
 
 
 def main():
+    details = compute_example_details()
+    example_score = details["score"]
+    example_decision = details["decision"]
     fig, ax = plt.subplots(figsize=(8.6, 5.4))
     ax.set_xlim(0, 12.9)
-    ax.set_ylim(0, 8.3)
+    ax.set_ylim(0, 8.7)
     ax.axis("off")
+
+    txt(
+        ax,
+        6.45,
+        8.48,
+        "Illustrative target architecture — repository L2 is HMAC simulation; L3/L4 are experimental proxies",
+        6.5,
+        GRAY,
+        weight="bold",
+    )
 
     # ============ TOP BAND: the RAG pipeline with the attack ============
     band_y = 5.55
@@ -132,13 +192,13 @@ def main():
     lw_ = 2.55
     xs = [0.35, 3.35, 6.35, 9.35]
     layers = [
-        ("L1 · Prompt analysis", "81-pattern classifier\non the user query",
+        ("L1 · Prompt analysis", f"{PATTERN_COUNT}-pattern classifier\non the user query",
          '"refund policy" — clean', GREEN, GREEN_BG, "s\u2081 = 0.1", 0.35),
-        ("L2 · Embedding attestation", "TEE certificate check\n(SEV-SNP signed)",
-         "poisoned vector has\nNO valid certificate", RED, RED_BG, "s\u2082 = 1.0", 0.75),
-        ("L3 · Retrieval analysis", "PCA subspace + KL vs\nhistorical distribution",
-         "similarity distribution\nshifted ($D_{KL} > \\tau$)", RED, RED_BG, "s\u2083 = 0.8", 0.50),
-        ("L4 · Output verification", "stability under K=5\nretrieval perturbations",
+        ("L2 · Provenance check", "target: SEV-SNP report\nrepo: HMAC simulation",
+         "poisoned vector has\nNO provenance evidence", RED, RED_BG, "s\u2082 = 1.0", 0.75),
+        ("L3 · Retrieval analysis", "experimental PCA +\nMahalanobis proxy",
+         "embedding distribution\nshifted from baseline", RED, RED_BG, "s\u2083 = 0.8", 0.50),
+        ("L4 · Output proxy", "synthetic output under K=5\ndocument perturbations",
          "answer flips when the\npoisoned doc is ablated", AMBER, AMBER_BG, "s\u2084 = 0.7", 0.20),
     ]
     for (title, mech, finding, fc_c, fc_bg, sig, beta), x in zip(layers, xs):
@@ -162,13 +222,16 @@ def main():
     # ============ CORRELATION ENGINE (bottom band) ============
     ey = 0.55
     box(ax, 2.6, ey, 7.7, 1.55, "#f7f8fa", INK, 1.2)
-    txt(ax, 6.45, ey + 1.28, "Threat Correlation Engine — weighted signal fusion", 8.2, INK, weight="bold")
+    txt(ax, 6.45, ey + 1.28, "Threat Correlation Engine — consensus + strongest-signal floor", 8.0, INK, weight="bold")
     txt(ax, 6.45, ey + 0.82,
-        "ThreatScore = 0.35(0.1) + 0.75(1.0) + 0.50(0.8) + 0.20(0.7) = 1.225",
-        8.2, INK)
+        f"consensus = Σβs / Σβ = {details['weighted_sum']:.3f} / "
+        f"{details['weight_total']:.2f} = {details['consensus']:.3f}; "
+        f"strongest signal = {details['strongest']:.3f}",
+        7.7, INK)
     txt(ax, 6.45, ey + 0.38,
-        "each signal is weak or moderate alone — only the correlation crosses the block threshold (0.85)",
-        6.8, GRAY, style="italic")
+        f"max(consensus, strongest) + {details['boost']:.3f} boost; "
+        f"clipped ThreatScore = {example_score:.3f}",
+        7.2, GRAY, style="italic")
 
     # signals converge
     for x in xs:
@@ -176,10 +239,10 @@ def main():
 
     # verdict
     box(ax, 10.75, ey + 0.35, 1.85, 0.85, RED_BG, RED, 1.6, r=0.02)
-    txt(ax, 11.67, ey + 0.92, "BLOCK", 10.5, RED, weight="bold")
-    txt(ax, 11.67, ey + 0.57, "1.225 \u2265 0.85", 7.2, RED)
+    txt(ax, 11.67, ey + 0.92, example_decision.value.upper(), 10.5, RED, weight="bold")
+    txt(ax, 11.67, ey + 0.57, f"{example_score:.3f} ≥ 0.85", 7.2, RED)
     arrow(ax, 10.32, ey + 0.77, 10.72, ey + 0.77, RED, 1.6)
-    txt(ax, 11.67, ey - 0.02, "safe fallback response to user", 6.6, GRAY)
+    txt(ax, 11.67, ey - 0.02, "caller enforces decision", 6.4, GRAY)
 
     # legend
     ax.plot([0.35, 0.75], [0.28, 0.28], color=BLUE, lw=1.6)

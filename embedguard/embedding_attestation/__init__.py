@@ -1,25 +1,15 @@
-"""
-Layer 2: Cryptographic Embedding Attestation.
+"""Layer 2 software provenance simulator.
 
-This module implements TEE-based cryptographic verification of embedding provenance.
-It transforms embedding security from a statistical inference problem into a
-cryptographic verification problem.
-
-Performance (from paper):
-    - Signature generation: 1.8ms per embedding
-    - Validation overhead: 0.3ms per document
-    - Batch validation (10 docs): 2.1ms
-
-Note:
-    Full TEE functionality requires AMD SEV-SNP or Intel SGX hardware.
-    This implementation provides a software simulation for development/testing.
+This module binds document, model, and embedding hashes with HMAC for development
+and certificate-plumbing tests. It does not obtain or validate hardware attestation.
 """
 
 import hashlib
 import hmac
-import time
+import json
+import secrets
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -39,7 +29,8 @@ class AttestationCertificate:
         timestamp: Certificate generation timestamp
         validity_period: Certificate validity duration
         signature: Cryptographic signature binding all fields
-        pcr_values: Platform Configuration Register values (TEE)
+        pcr_values: Legacy field for optional simulated platform metadata;
+            not real TEE evidence
     """
 
     document_hash: str
@@ -52,9 +43,23 @@ class AttestationCertificate:
 
     def is_expired(self) -> bool:
         """Check if certificate has expired."""
-        cert_time = datetime.fromisoformat(self.timestamp)
-        expiry = cert_time + timedelta(seconds=self.validity_period)
-        return datetime.utcnow() > expiry
+        if (
+            not isinstance(self.validity_period, int)
+            or isinstance(self.validity_period, bool)
+            or self.validity_period <= 0
+        ):
+            return True
+        try:
+            cert_time = datetime.fromisoformat(self.timestamp)
+        except (TypeError, ValueError):
+            return True
+        if cert_time.tzinfo is None:
+            cert_time = cert_time.replace(tzinfo=timezone.utc)
+        try:
+            expiry = cert_time + timedelta(seconds=self.validity_period)
+        except OverflowError:
+            return True
+        return datetime.now(timezone.utc) > expiry
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -70,19 +75,16 @@ class AttestationCertificate:
 
 
 class EmbeddingAttestationLayer:
-    """TEE-based embedding attestation layer.
+    """Software HMAC simulator for embedding provenance certificates.
 
-    This implements Layer 2 of the EmbedGuard architecture. In production with
-    TEE hardware (AMD SEV-SNP), embeddings are generated inside a secure enclave
-    and cryptographically signed.
-
-    For development/testing without TEE hardware, this provides a software
-    simulation that demonstrates the attestation protocol.
+    This development implementation binds document, model, and embedding hashes.
+    It does not generate or verify TEE evidence, even when ``tee_available`` is
+    true; that compatibility flag only adds simulated platform metadata.
 
     Attributes:
         model_name: Name of the embedding model
         device: Device for embedding generation
-        secret_key: Key for signing certificates (in production, from TEE)
+        secret_key: Key for signing simulated certificates
         validity_period: Certificate validity in seconds
 
     Example:
@@ -109,15 +111,21 @@ class EmbeddingAttestationLayer:
             device: Device for inference
             secret_key: HMAC key for signing (auto-generated if None)
             validity_period: Certificate validity in seconds
-            tee_available: Whether TEE hardware is available
+            tee_available: Whether to include simulated platform metadata;
+                this does not enable hardware attestation
         """
         self.model_name = model_name
         self.device = device
+        if (
+            not isinstance(validity_period, int)
+            or isinstance(validity_period, bool)
+            or validity_period <= 0
+        ):
+            raise ValueError("validity_period must be a positive integer")
         self.validity_period = validity_period
         self.tee_available = tee_available
 
-        # In production, this key is protected by TEE
-        # Here we simulate with a random key
+        # The simulator uses an ephemeral key unless the caller supplies one.
         self.secret_key = secret_key or self._generate_secret_key()
 
         # Load embedding model lazily
@@ -128,50 +136,13 @@ class EmbeddingAttestationLayer:
         )
 
     def _generate_secret_key(self) -> bytes:
-        """Generate or load a secret key for signing.
-        
-        Keys are persisted to disk to survive restarts. In production,
-        this would be replaced with TEE-protected key storage.
-        
-        Security Note: File-based storage is for development only.
-        Production deployments should use:
-        - AMD SEV-SNP: Hardware-protected attestation keys
-        - Intel SGX: Sealing keys in encrypted enclaves
-        - Cloud KMS: AWS KMS, GCP KMS, or Azure Key Vault
+        """Generate an ephemeral development key for HMAC signing.
+
+        Callers that need certificates to survive process restarts must provide
+        ``secret_key`` explicitly and manage it outside this simulator.
         """
-        import secrets
-        import os
-        from pathlib import Path
-        
-        # Use XDG_CONFIG_HOME or fallback to ~/.config
-        config_dir = Path(os.environ.get(
-            'XDG_CONFIG_HOME', 
-            os.path.expanduser('~/.config')
-        )) / 'embedguard'
-        key_file = config_dir / '.attestation_key'
-        
-        # Load existing key if available
-        if key_file.exists():
-            try:
-                key = key_file.read_bytes()
-                if len(key) == 32:
-                    logger.debug("Loaded existing attestation key")
-                    return key
-            except Exception as e:
-                logger.warning(f"Failed to load key: {e}")
-        
-        # Generate new key and persist
-        key = secrets.token_bytes(32)
-        try:
-            config_dir.mkdir(parents=True, exist_ok=True)
-            # Secure file permissions (owner read/write only)
-            key_file.write_bytes(key)
-            key_file.chmod(0o600)
-            logger.info(f"Generated new attestation key at {key_file}")
-        except Exception as e:
-            logger.warning(f"Failed to persist key: {e}. Using ephemeral key.")
-        
-        return key
+        logger.debug("Generated ephemeral HMAC provenance key")
+        return secrets.token_bytes(32)
 
     def _get_embedding_model(self):
         """Lazily load embedding model."""
@@ -206,6 +177,29 @@ class EmbeddingAttestationLayer:
         ).hexdigest()
         return signature
 
+    @staticmethod
+    def _certificate_payload(
+        document_hash: str,
+        model_hash: str,
+        embedding_hash: str,
+        timestamp: str,
+        validity_period: int,
+        pcr_values: Optional[Dict[str, str]],
+    ) -> str:
+        """Serialize every mutable certificate field into the signed payload."""
+        return json.dumps(
+            {
+                "document_hash": document_hash,
+                "embedding_hash": embedding_hash,
+                "model_hash": model_hash,
+                "pcr_values": pcr_values,
+                "timestamp": timestamp,
+                "validity_period": validity_period,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
     def _verify_signature(self, data: str, signature: str) -> bool:
         """Verify signature."""
         expected = self._sign_certificate(data)
@@ -214,10 +208,10 @@ class EmbeddingAttestationLayer:
     def generate_embedding_with_attestation(
         self, document: str
     ) -> Tuple[List[float], AttestationCertificate]:
-        """Generate embedding inside TEE and create attestation certificate.
+        """Generate an embedding and a software HMAC provenance certificate.
 
-        In production with TEE hardware, this entire operation happens inside
-        the secure enclave, with the signature protected by hardware keys.
+        This method does not execute inside a TEE and does not produce a hardware
+        attestation report.
 
         Args:
             document: Document content to embed
@@ -227,26 +221,33 @@ class EmbeddingAttestationLayer:
         """
         # Generate embedding
         model = self._get_embedding_model()
-        if model is not None:
-            embedding = model.encode(document, convert_to_numpy=True).tolist()
-        else:
-            # Fallback: generate random embedding for testing
-            embedding = np.random.randn(768).tolist()
+        if model is None:
+            raise RuntimeError(
+                "No embedding model is available; refusing to attest a random vector"
+            )
+        embedding = model.encode(document, convert_to_numpy=True).tolist()
 
         # Create attestation certificate
         document_hash = self._compute_document_hash(document)
         embedding_hash = self._compute_embedding_hash(embedding)
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
 
-        # Build signature data
-        sign_data = f"{document_hash}|{self.MODEL_HASH}|{embedding_hash}|{timestamp}"
-        signature = self._sign_certificate(sign_data)
-
-        # PCR values would come from TEE in production
+        # Legacy compatibility metadata only; not an attestation report.
         pcr_values = {
-            "PCR0": hashlib.sha256(b"firmware").hexdigest()[:16],
-            "PCR7": hashlib.sha256(b"secureboot").hexdigest()[:16],
+            "simulated_firmware": hashlib.sha256(b"firmware").hexdigest()[:16],
+            "simulated_boot_state": hashlib.sha256(b"secureboot").hexdigest()[:16],
         } if self.tee_available else None
+
+        # Bind every mutable field that verification or callers can observe.
+        sign_data = self._certificate_payload(
+            document_hash,
+            self.MODEL_HASH,
+            embedding_hash,
+            timestamp,
+            self.validity_period,
+            pcr_values,
+        )
+        signature = self._sign_certificate(sign_data)
 
         certificate = AttestationCertificate(
             document_hash=document_hash,
@@ -297,12 +298,19 @@ class EmbeddingAttestationLayer:
             errors.append("Model hash mismatch")
 
         # Verify signature
-        sign_data = (
-            f"{certificate.document_hash}|{certificate.model_hash}|"
-            f"{certificate.embedding_hash}|{certificate.timestamp}"
-        )
-        if not self._verify_signature(sign_data, certificate.signature):
-            errors.append("Invalid signature")
+        try:
+            sign_data = self._certificate_payload(
+                certificate.document_hash,
+                certificate.model_hash,
+                certificate.embedding_hash,
+                certificate.timestamp,
+                certificate.validity_period,
+                certificate.pcr_values,
+            )
+            if not self._verify_signature(sign_data, certificate.signature):
+                errors.append("Invalid signature")
+        except (TypeError, ValueError):
+            errors.append("Malformed certificate payload")
 
         is_valid = len(errors) == 0
 

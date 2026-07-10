@@ -1,10 +1,9 @@
 """Configuration management for EmbedGuard."""
 
-from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class OperationalMode(str, Enum):
@@ -20,16 +19,26 @@ class EmbedGuardConfig(BaseModel):
 
     Attributes:
         mode: Operational mode (passive, gated, active)
-        enable_tee: Enable TEE-based attestation (requires hardware support)
+        enable_tee: Legacy toggle for the software HMAC provenance simulator;
+            it does not enable hardware-backed TEE attestation
         enable_prompt_detection: Enable prompt injection detection layer
+        enable_neural_prompt_detection: Opt into a separately supplied neural
+            prompt-classification checkpoint; disabled by default
         enable_retrieval_analysis: Enable retrieval distributional analysis
         enable_output_verification: Enable output consistency verification
+        use_semantic_output_similarity: Opt into sentence-transformer output
+            similarity; disabled by default to avoid implicit model downloads
         thresholds: Detection thresholds for each component
         layer_weights: Weights for combining layer signals
         model_name: Embedding model name for semantic similarity
         device: Device for model inference (cuda, cpu, mps)
         random_seed: Random seed for reproducibility
+        enable_audit_log: Deprecated compatibility field. EmbedGuard does not
+            persist audit logs; callers own record construction and storage.
+        audit_log_path: Deprecated compatibility field. Paths are not consumed.
     """
+
+    model_config = ConfigDict(use_enum_values=True, extra="allow")
 
     # Core settings
     mode: OperationalMode = Field(
@@ -40,11 +49,21 @@ class EmbedGuardConfig(BaseModel):
     # Layer toggles
     enable_tee: bool = Field(
         default=False,
-        description="Enable TEE attestation (requires AMD SEV-SNP or Intel SGX)"
+        description=(
+            "Enable the software HMAC provenance simulator; this does not enable "
+            "hardware-backed TEE attestation"
+        )
     )
     enable_prompt_detection: bool = Field(
         default=True,
         description="Enable prompt injection detection layer"
+    )
+    enable_neural_prompt_detection: bool = Field(
+        default=False,
+        description=(
+            "Enable neural prompt classification using a separately available "
+            "fine-tuned checkpoint"
+        ),
     )
     enable_retrieval_analysis: bool = Field(
         default=True,
@@ -53,6 +72,13 @@ class EmbedGuardConfig(BaseModel):
     enable_output_verification: bool = Field(
         default=True,
         description="Enable output consistency verification layer"
+    )
+    use_semantic_output_similarity: bool = Field(
+        default=False,
+        description=(
+            "Use sentence-transformer similarity in the output proxy; when false, "
+            "use deterministic Jaccard overlap without downloading a model"
+        ),
     )
 
     # Thresholds
@@ -134,18 +160,31 @@ class EmbedGuardConfig(BaseModel):
         description="Logging level"
     )
     enable_audit_log: bool = Field(
-        default=True,
-        description="Enable detailed audit logging"
+        default=False,
+        deprecated=(
+            "EmbedGuard does not persist audit logs; callers own record "
+            "construction and storage"
+        ),
+        description="Deprecated compatibility field; no persistence is implemented"
     )
     audit_log_path: Optional[str] = Field(
         default=None,
-        description="Path for audit logs"
+        deprecated="EmbedGuard does not write audit-log files",
+        description="Deprecated compatibility field; this path is not consumed"
     )
 
-    class Config:
-        """Pydantic configuration."""
-        use_enum_values = True
-        extra = "allow"
+    @model_validator(mode="after")
+    def reject_unimplemented_audit_persistence(self) -> "EmbedGuardConfig":
+        """Fail closed rather than accepting no-op persistence controls."""
+        if (
+            self.__dict__.get("enable_audit_log", False)
+            or self.__dict__.get("audit_log_path") is not None
+        ):
+            raise ValueError(
+                "EmbedGuard does not persist audit logs; construct and store "
+                "caller-owned records from AnalysisResult"
+            )
+        return self
 
     def get_threshold(self, name: str) -> float:
         """Get threshold by name with default fallback."""
@@ -160,7 +199,8 @@ class EmbedGuardConfig(BaseModel):
 PRESET_CONFIGS = {
     "high_security": EmbedGuardConfig(
         mode=OperationalMode.ACTIVE,
-        enable_tee=True,
+        # Do not auto-enable the HMAC simulator: it is not a security boundary.
+        enable_tee=False,
         thresholds={
             "prompt_injection": 0.60,
             "kl_divergence": 0.10,

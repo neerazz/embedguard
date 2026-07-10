@@ -15,8 +15,8 @@
 - Conceptualization and research design
 - Architecture development (4-layer detection framework)
 - Implementation of all detection layers:
-  - Prompt injection detector (81 patterns)
-  - TEE-based embedding attestation protocol
+  - Prompt injection detector (83 patterns)
+  - HMAC software attestation simulator and target TEE protocol design
   - Retrieval distributional analyzer
   - Output consistency verifier
   - Threat correlation engine
@@ -43,7 +43,7 @@ If you use EmbedGuard in your research, please cite:
 ```bibtex
 @software{beshane_embedguard_2026,
   author = {Beshane, Neeraj Kumar Singh},
-  title = {{EmbedGuard: Cross-Layer Detection and Cryptographic Attestation for Secure Retrieval-Augmented Generation}},
+  title = {{EmbedGuard: Cross-Layer Detection and Provenance Attestation for Adversarial Embedding Attacks in RAG Systems}},
   year = {2026},
   doi = {10.5281/zenodo.18364919},
   url = {https://github.com/neerazz/embedguard}

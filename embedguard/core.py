@@ -2,8 +2,8 @@
 
 import time
 import uuid
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from datetime import datetime, timezone
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from loguru import logger
 
@@ -16,25 +16,24 @@ from embedguard.retrieval_analyzer import RetrievalDistributionalAnalyzer
 from embedguard.types import (
     AnalysisResult,
     AttackType,
-    Decision,
     Document,
     LayerSignal,
-    ThreatLevel,
 )
 
 
 class EmbedGuard:
     """Main EmbedGuard framework for RAG security.
 
-    EmbedGuard implements cross-layer detection and cryptographic attestation
-    for protecting RAG systems against embedding space poisoning attacks.
+    EmbedGuard coordinates reference detection components for RAG security
+    experiments. Its released attestation component is an HMAC software simulator,
+    not hardware-backed cryptographic attestation.
 
     Architecture:
-        Layer 1: Prompt Injection Detection (DistilBERT classifier)
-        Layer 2: Embedding Attestation (TEE-based, optional)
-        Layer 3: Retrieval Distributional Analysis (PCA, KL divergence)
-        Layer 4: Output Consistency Verification (perturbation testing)
-        + Threat Correlation Engine (weighted signal fusion)
+        Layer 1: Prompt Injection Detection (patterns; optional checkpoint)
+        Layer 2: Embedding Provenance (software HMAC simulator)
+        Layer 3: Experimental Retrieval Analysis (PCA, Mahalanobis distance)
+        Layer 4: Synthetic Output-Consistency Proxy
+        + Threat Correlation Engine (consensus/floor/correlation boost)
 
     Example:
         >>> from embedguard import EmbedGuard, EmbedGuardConfig
@@ -64,6 +63,7 @@ class EmbedGuard:
                 model_name=self.config.prompt_classifier_model,
                 device=self.config.device,
                 threshold=self.config.get_threshold("prompt_injection"),
+                use_neural=self.config.enable_neural_prompt_detection,
             )
             logger.debug("Prompt injection detector initialized")
         else:
@@ -75,7 +75,7 @@ class EmbedGuard:
                 model_name=self.config.model_name,
                 device=self.config.device,
             )
-            logger.debug("TEE attestation layer initialized")
+            logger.debug("Software HMAC provenance simulator initialized")
         else:
             self.attestation_layer = None
 
@@ -97,6 +97,7 @@ class EmbedGuard:
                 device=self.config.device,
                 k_perturbations=self.config.perturbation_count,
                 stability_threshold=self.config.get_threshold("output_stability_min"),
+                use_semantic_model=self.config.use_semantic_output_similarity,
             )
             logger.debug("Output verifier initialized")
         else:
@@ -116,6 +117,7 @@ class EmbedGuard:
         documents: Union[List[str], List[Document]],
         embeddings: Optional[List[List[float]]] = None,
         generated_output: Optional[str] = None,
+        output_generator: Optional[Callable[[str, List[Document]], str]] = None,
     ) -> AnalysisResult:
         """Analyze a RAG query and documents for potential attacks.
 
@@ -126,7 +128,10 @@ class EmbedGuard:
             query: The user query being processed
             documents: Retrieved documents (strings or Document objects)
             embeddings: Optional pre-computed embeddings for documents
-            generated_output: Optional generated output for consistency checking
+            generated_output: Optional baseline output produced by
+                ``output_generator``
+            output_generator: Optional callback used to rerun the same generator
+                over original and perturbed document sets
 
         Returns:
             AnalysisResult containing threat score, decision, and layer signals
@@ -169,11 +174,16 @@ class EmbedGuard:
         if self.output_verifier is not None:
             should_verify = (
                 generated_output is not None
+                or output_generator is not None
                 or self._should_verify_output(layer_signals)
             )
             if should_verify:
                 signal = self._run_output_verification(
-                    query, doc_objects, generated_output, session_id
+                    query,
+                    doc_objects,
+                    generated_output,
+                    output_generator,
+                    session_id,
                 )
                 layer_signals["output"] = signal
                 if signal.score > (1 - self.config.get_threshold("output_stability_min")):
@@ -202,7 +212,7 @@ class EmbedGuard:
             query=query,
             num_documents=len(doc_objects),
             session_id=session_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
         logger.info(
@@ -310,13 +320,17 @@ class EmbedGuard:
         query: str,
         documents: List[Document],
         generated_output: Optional[str],
+        output_generator: Optional[Callable[[str, List[Document]], str]],
         session_id: str,
     ) -> LayerSignal:
         """Run output consistency verification layer."""
         start = time.time()
         try:
             score, confidence, details = self.output_verifier.verify(
-                query, documents, generated_output
+                query,
+                documents,
+                generated_output,
+                output_generator,
             )
             latency = (time.time() - start) * 1000
             return LayerSignal(
@@ -340,8 +354,8 @@ class EmbedGuard:
     def _should_verify_output(self, layer_signals: Dict[str, LayerSignal]) -> bool:
         """Determine if output verification should be triggered.
 
-        Per the paper, output verification only runs for queries with
-        elevated threat signals from prior layers (<0.1% of traffic).
+        Output verification runs only when prior-layer signals cross the
+        configured preliminary threat threshold. Trigger frequency is unvalidated.
         """
         if not layer_signals:
             return False

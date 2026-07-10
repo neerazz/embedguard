@@ -1,23 +1,18 @@
 """
 Layer 1: Prompt Injection Detection.
 
-This module implements DistilBERT-based neural classification for detecting
-prompt injection attempts and jailbreak patterns.
-
-Performance (from paper):
-    - Detection accuracy: 87.3%
-    - Mean latency: 4.2ms
-    - Training data: 156,000 adversarial-benign query pairs
+The released default is an 83-signature pattern detector with normalization.
+Neural classification is opt-in and requires a separately supplied fine-tuned
+checkpoint; this repository does not publish that checkpoint or its training set.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
-import torch
 from loguru import logger
 
-# Injection pattern signatures (81 patterns for comprehensive detection)
+# Injection pattern signatures (83 patterns; count is regression-tested)
 INJECTION_PATTERNS = [
     # Direct instruction injection
     r"ignore\s+(all\s+)?(previous|prior|above)?\s*(instructions?|prompts?|context)",
@@ -133,7 +128,7 @@ def normalize_input(text: str) -> str:
     
     This function handles several evasion techniques:
         - Whitespace injection: "I g n o r e" -> "ignore"
-        - Unicode homoglyphs: Cyrillic "а" -> Latin "a" (via NFKC)
+        - Unicode compatibility forms: full-width Latin -> ASCII (via NFKC)
         - Zero-width characters: Invisible separators removed
         - Case normalization: "IGNORE" -> "ignore"
     
@@ -146,7 +141,7 @@ def normalize_input(text: str) -> str:
     Example:
         >>> normalize_input("I g n o r e")
         'ignore'
-        >>> normalize_input("Ignоre")  # Cyrillic 'о'
+        >>> normalize_input("Ｉｇｎｏｒｅ")  # Full-width Latin characters
         'ignore'
     """
     import unicodedata
@@ -155,7 +150,7 @@ def normalize_input(text: str) -> str:
     zwc_pattern = re.compile(r'[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]')
     text = zwc_pattern.sub('', text)
     
-    # Normalize Unicode (NFKC handles homoglyphs, e.g., Cyrillic -> Latin)
+    # Normalize Unicode compatibility forms (for example, full-width Latin).
     text = unicodedata.normalize('NFKC', text)
     
     # Remove all whitespace for pattern matching
@@ -191,7 +186,7 @@ class PromptInjectionDetector:
         device: str = "cpu",
         threshold: float = 0.70,
         use_patterns: bool = True,
-        use_neural: bool = True,
+        use_neural: bool = False,
     ):
         """Initialize the prompt injection detector.
 
@@ -200,7 +195,8 @@ class PromptInjectionDetector:
             device: Device for inference (cuda, cpu, mps)
             threshold: Detection threshold
             use_patterns: Enable regex pattern matching
-            use_neural: Enable neural classification
+            use_neural: Enable neural classification. This can require network
+                access and a separately available fine-tuned checkpoint.
         """
         self.model_name = model_name
         self.device = device
@@ -240,24 +236,25 @@ class PromptInjectionDetector:
         try:
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-            # For demo purposes, we use a pre-trained model
-            # In production, this would be fine-tuned on injection data
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
-            # Check if we have a fine-tuned model, otherwise use base
             try:
                 self.model = AutoModelForSequenceClassification.from_pretrained(
                     "embedguard/prompt-injection-classifier"
                 )
-            except Exception:
-                # Fallback: use base model with random classification head
-                self.model = AutoModelForSequenceClassification.from_pretrained(
-                    self.model_name, num_labels=2
+            except Exception as exc:
+                logger.warning(
+                    "Fine-tuned prompt-injection checkpoint unavailable; "
+                    f"disabling neural detection: {exc}"
                 )
-                logger.warning("Using base model - fine-tuned model not available")
+                self.model = None
+                self.tokenizer = None
+                self.use_neural = False
+                return
 
             self.model.to(self.device)
-            self.model.eval()
+            set_inference_mode = getattr(self.model, "eval")
+            set_inference_mode()
             logger.debug("Neural model loaded successfully")
         except ImportError:
             logger.warning("Transformers not available, using pattern-only detection")
@@ -327,7 +324,7 @@ class PromptInjectionDetector:
         """Detect injections using regex patterns.
         
         Checks both original text and normalized text to defeat
-        obfuscation attacks like whitespace injection and homoglyphs.
+        obfuscation attacks like whitespace injection and compatibility forms.
 
         Args:
             query: Input query
@@ -379,6 +376,8 @@ class PromptInjectionDetector:
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
             # Inference
+            import torch
+
             with torch.no_grad():
                 outputs = self.model(**inputs)
                 logits = outputs.logits

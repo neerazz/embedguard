@@ -5,6 +5,80 @@ All notable changes to EmbedGuard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Planned
+
+- PyPI package distribution
+- Pre-trained prompt injection classifier
+- GPU acceleration for neural components
+- Streaming analysis mode
+- Prometheus metrics integration
+- Web dashboard for monitoring
+
+## [1.2.0] - 2026-07-10
+
+Evidence-integrity hardening for the open benchmark and manuscript v3.1. The
+IJCESEN version-of-record results remain unchanged.
+
+### Fixed
+
+- The public benchmark now executes the package's production
+  `PromptInjectionDetector` in pattern-only mode instead of a duplicated
+  81-pattern implementation that had drifted from the package.
+- Statistical analysis now derives Wilson intervals from observed confusion-
+  matrix counts and fails closed when evidence is missing; synthetic scores,
+  invalid comparator tests, and fallback paper values were removed.
+- Benchmark JSON now records input/source SHA-256 hashes, the nearest source
+  commit when available, runtime/dependency metadata, and timing scope.
+- Manuscript claims now match the committed 83-pattern result artifact and
+  distinguish deterministic classification counts from host-dependent timing.
+- Default construction performs no implicit model request; neural prompt
+  detection and semantic output similarity are explicit opt-ins.
+- Gated decisions are held by the integration examples instead of allowing
+  flagged requests to continue to generation.
+- The target AMD SEV-SNP diagram now uses report-data binding and VCEK-chain
+  verification rather than TPM-style PCR terminology.
+- Real generated outputs are never compared with synthetic perturbation
+  proxies; same-generator testing now requires an explicit caller callback.
+- Retrieval PCA now fits accumulated embedding rows at warm-up instead of
+  leaving zero-valued components or fitting only the latest query batch.
+- Correlation boosts now require confidence-weighted elevation, so
+  zero-confidence layer scores cannot manufacture an active-mode block.
+- Public titles, citations, badges, dependency declarations, commands, and
+  figure captions now agree on the v1.2.0 package boundary.
+
+### Changed
+
+- Heavy neural/vector dependencies moved to explicit `neural` and `vector`
+  extras; the core install is model-free.
+- The HMAC provenance simulator uses an ephemeral key unless the caller supplies
+  one and no longer writes a key into the user's home directory by default.
+- The simulator HMAC now binds the validity period and simulated platform
+  metadata, preventing post-issuance expiry extension or metadata mutation.
+- The generic CLI benchmark classifies by threat score independently of
+  operational mode and computes FPR/FNR over benign/attack denominators.
+- The architecture figure's worked fusion arithmetic and the target SEV-SNP
+  figure's nonce, replay, report-signature, and verification steps now match
+  the implementation and protocol text.
+
+### Removed
+
+- Unsupported JailbreakBench/GCG/PAIR/AutoDAN/TAP result claims.
+- Estimated pattern-count, neural, and Tier-2 cross-layer ablation tables.
+- Unsupported institutional-review exemption and pre-built-container claims.
+- Unsupported README comparator and unmeasured operational storage/review-time
+  claims.
+
+### Added
+
+- `tests/test_evidence_integrity.py` guards benchmark/package parity and
+  observed-count-only statistical analysis.
+- Canonical v1.2.0 benchmark artifacts and count-based uncertainty output.
+- A documented browser-rendered manuscript PDF and machine-readable Tier-1
+  ablation transcription; the transcription is explicitly non-causal and is
+  not presented as open reproduction.
+
 ## [1.1.0] - 2026-07-09
 
 Post-publication maintenance and manuscript extension. The paper's published
@@ -66,20 +140,23 @@ delta from the version of record is auditable, not silent drift.
   - Configurable thresholds and layer weights
 
 - **Layer 1: Prompt Injection Detection**
-  - DistilBERT-based neural classifier
+  - Pattern detector plus optional neural-classifier scaffolding; no fine-tuned
+    neural checkpoint was distributed
   - 16 regex patterns for known injection signatures
-  - 87.3% detection accuracy with 4.2ms latency
   - Batch detection support
+  - Historical metadata claimed 87.3% detection and 4.2ms latency, but no raw
+    result artifact was archived; v1.2 does not treat those values as evidence
 
-- **Layer 2: Cryptographic Embedding Attestation**
-  - TEE-based embedding generation (software simulation)
+- **Layer 2: Software Provenance Simulation**
+  - HMAC-based embedding provenance simulation
   - Cryptographic signing of embedding provenance
   - Certificate generation and verification
-  - AMD SEV-SNP and Intel SGX support (hardware required)
+  - AMD SEV-SNP remained an architectural target; no hardware integration shipped
 
 - **Layer 3: Retrieval Distributional Analysis**
   - Incremental PCA for anomaly detection
-  - KL divergence monitoring
+  - Distribution-distance monitoring (legacy API uses `kl_divergence` naming;
+    implementation computes Mahalanobis distance)
   - Temporal rank correlation analysis
   - Baseline distribution tracking
 
@@ -116,26 +193,21 @@ delta from the version of record is auditable, not silent drift.
   - Correlation engine tests
   - Shared test fixtures
 
-### Performance
+### Published Reference Performance
+
+The associated article reported the following Tier-1 values; the v1.0.0 archive
+did not contain the production corpus, raw predictions, or hardware logs needed
+to reproduce them:
 
 - 94.7% detection rate against optimization-based attacks
 - 89.3% detection rate against adaptive attacks
 - 51ms mean latency overhead
 - 3.2% false positive rate
 
-### Security
+### Proposed Security Architecture
 
-- Cross-layer detection provides 18.4pp improvement over single-layer
-- Hardware-backed attestation transforms security to cryptographic verification
-- Adaptive attack resilience with 27.9-35.1pp improvements over existing defenses
-
-## [Unreleased]
-
-### Planned
-
-- PyPI package distribution
-- Pre-trained prompt injection classifier
-- GPU acceleration for neural components
-- Streaming analysis mode
-- Prometheus metrics integration
-- Web dashboard for monitoring
+- The article reported an 18.4pp cross-layer improvement; the open archive did
+  not include the ablation outputs needed to reproduce it
+- Hardware-backed attestation was a target design, not a v1.0.0 package capability
+- Historical 27.9-35.1pp comparator claims lacked open baseline outputs and are
+  not retained as current evidence
