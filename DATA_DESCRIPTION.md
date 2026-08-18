@@ -4,6 +4,8 @@
 
 This archive contains the EmbedGuard reference implementation, locally curated benchmark-style inputs, attack regression samples, and recorded result artifacts. The open benchmark exercises only the pattern-based prompt detector; it does not reproduce the archived production-scale, TEE, corpus-poisoning, or cross-layer results reported by the IJCESEN article.
 
+The [Threat model and evaluation protocol](docs/THREAT_MODEL_AND_EVALUATION.md) defines attacker profiles, scenario construction, why Tier 2 has no train/test split, and which claims each evidence tier can support.
+
 ## Repository Structure
 
 ```

@@ -27,6 +27,8 @@ Peer-reviewed: [IJCESEN, 2026 — DOI 10.22399/ijcesen.4869](https://doi.org/10.
 
 Post-publication manuscript v3.1: [Markdown](paper/manuscript.md) · [rendered PDF](paper/manuscript.pdf).
 
+For the exact attacker capabilities, scenario construction, dataset preparation, train/test-split answer, and the conditions under which each metric is defensible, read the [Threat model and evaluation protocol](docs/THREAT_MODEL_AND_EVALUATION.md).
+
 ### Quick start
 
 ```bash

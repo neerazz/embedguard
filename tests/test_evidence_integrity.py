@@ -188,6 +188,22 @@ def test_default_install_excludes_optional_model_runtimes():
     assert any(item.startswith("faiss-cpu") for item in extras["vector"])
 
 
+def test_public_docs_explain_threat_model_and_evaluation_boundary():
+    """Reviewers must be able to trace attackers, data construction, and evidence scope."""
+    methods_path = REPO_ROOT / "docs" / "THREAT_MODEL_AND_EVALUATION.md"
+    assert methods_path.is_file()
+
+    methods = methods_path.read_text(encoding="utf-8")
+    assert "## Attacker profiles" in methods
+    assert "## Scenario construction" in methods
+    assert "## Why there is no train/test split in Tier 2" in methods
+    assert "does not contain enough evidence to reconstruct a Tier-1 train/test split" in methods
+
+    link = "[Threat model and evaluation protocol](docs/THREAT_MODEL_AND_EVALUATION.md)"
+    assert link in (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert link in (REPO_ROOT / "DATA_DESCRIPTION.md").read_text(encoding="utf-8")
+
+
 def test_statistical_analysis_writes_only_observed_count_results(tmp_path):
     """The CLI helper must persist exactly the count-based analysis it returns."""
     source = tmp_path / "results.json"
