@@ -105,6 +105,10 @@ def sha256(path: Path) -> str:
 
 
 def version(pkg: str) -> str | None:
+    if pkg == "embedguard":
+        # Report the imported source, not possibly stale installed metadata.
+        import embedguard
+        return embedguard.__version__
     try:
         return metadata.version(pkg)
     except metadata.PackageNotFoundError:
