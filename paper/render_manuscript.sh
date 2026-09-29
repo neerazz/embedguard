@@ -39,7 +39,7 @@ cd "$PAPER_DIR"
     --standalone \
     --embed-resources \
     --css manuscript.css \
-    --metadata pagetitle="EmbedGuard manuscript v3.1" \
+    --metadata pagetitle="EmbedGuard manuscript v3.2" \
     --output "$HTML"
 
 rm -f "$OUTPUT"

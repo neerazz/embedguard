@@ -16,6 +16,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prometheus metrics integration
 - Web dashboard for monitoring
 
+## [1.3.0] - 2026-09-29
+
+Open corpus-poisoning evaluation and the retrieval-layer fixes it exposed. The
+IJCESEN version-of-record results remain unchanged.
+
+### Added
+
+- Tier-2b benchmark: `scripts/fetch_tier2b_data.py` downloads the PoisonedRAG
+  NQ adversarial passages and BEIR Natural Questions from pinned revisions and
+  checks SHA-256 digests; `scripts/tier2b_poisonedrag.py` runs the held-out
+  protocol; `scripts/run_tier2b.sh` regenerates the six committed result files.
+  See `docs/TIER2B_POISONEDRAG.md` and manuscript v3.2 §4.3.
+- `EmbedGuard.calibrate(clean_samples, target_fpr)` sets the FLAG threshold
+  from trusted traffic and freezes the retrieval baseline.
+- `EmbedGuardConfig.retrieval_component_weights` and the analyzer's
+  `component_weights`, `anomaly_threshold`, `calibrate_threshold`,
+  `freeze_baseline` and `unfreeze_baseline`.
+
+### Fixed
+
+- The retrieval rank component compared the current query's sorted score list
+  with the previous query's sorted list. Both are monotone, so Spearman was
+  always 1 and the component always returned 0 while holding weight 0.2. It
+  now compares document rankings with the most recent query that shares at
+  least two retrieved documents, and abstains otherwise.
+- Retrieval fusion now weights components by configured weight times
+  confidence and drops abstaining or zero-weight components, instead of a
+  fixed 0.5/0.3/0.2 average that included abstentions.
+- The adaptive retrieval baseline learned from the traffic it scored, so a
+  sustained shift desensitised it; `freeze_baseline` (called by `calibrate`)
+  stops that.
+- Manuscript v3.2 corrects the IBM breach figures (USD 4.88 million and 258
+  days, not USD 4.91 million and 267 days), 17 reference entries whose
+  authors, identifiers, titles or years were wrong, and claims that the
+  provenance layer detects corpus poisoning admitted through ingestion.
+- The version-consistency test matched `cff-version: 1.2.0` rather than the
+  package version in `CITATION.cff`.
+- `EmbedGuard.calibrate()` refuses when every calibration score is 0 instead
+  of setting a near-zero threshold; a frozen analyzer abstains rather than
+  initialising its baseline from scored traffic; ranking ignores NaN
+  similarities; all-zero component weights are rejected.
+- CI: the Python 3.10 job failed to collect the evidence-integrity tests
+  (no `tomllib`) since v1.2.0; it now installs `tomli`.
+
+### Measured
+
+- On PoisonedRAG NQ (50 test attacks, 200 test-clean queries), provenance
+  detects 0/50 poisoned passages submitted through the approved ingestion
+  path. The calibrated distance-only retrieval layer detects 50/50 (black-box)
+  and 48/50 (stealth) with five planted passages per target, 43/50 and 33/50
+  with three, and 7/50 with one, at 6/200 clean queries flagged. Package
+  defaults detect 0/50.
+
 ## [1.2.0] - 2026-07-10
 
 Evidence-integrity hardening for the open benchmark and manuscript v3.1. The

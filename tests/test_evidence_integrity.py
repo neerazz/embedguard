@@ -1,12 +1,17 @@
 """Integrity tests for the public benchmark and statistical analysis."""
 
 import json
+import re
 import hashlib
 import shutil
 from pathlib import Path
 
 import pytest
-import tomllib
+
+try:  # Python 3.11+
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10: the tomli backport has the same API
+    tomllib = pytest.importorskip("tomli")
 
 import embedguard
 from embedguard.prompt_detector import INJECTION_PATTERNS, PromptInjectionDetector
@@ -249,8 +254,16 @@ def test_latency_figure_uses_the_canonical_v1_2_result():
     assert provenance["input_file_sha256"]
     assert provenance["source_file_sha256"]
     for relative_path, expected_sha256 in provenance["source_file_sha256"].items():
-        actual_sha256 = hashlib.sha256((REPO_ROOT / relative_path).read_bytes()).hexdigest()
-        assert actual_sha256 == expected_sha256
+        content = (REPO_ROOT / relative_path).read_bytes()
+        if relative_path == "pyproject.toml":
+            # The canonical Tier-2 run was recorded at package version 1.2.0.
+            # A later version bump is the only permitted difference: restore
+            # the recorded version line and require every other byte to match.
+            content = re.sub(
+                rb'(?m)^version = "[^"]+"$', b'version = "1.2.0"', content, count=1
+            )
+        actual_sha256 = hashlib.sha256(content).hexdigest()
+        assert actual_sha256 == expected_sha256, relative_path
     assert provenance["python"]
     assert provenance["platform"]
     assert provenance["dependencies"]["numpy"] != "not-installed"
@@ -330,12 +343,12 @@ def test_release_version_is_consistent_across_public_metadata():
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     manuscript = (REPO_ROOT / "paper" / "manuscript.md").read_text(encoding="utf-8")
 
-    assert embedguard.__version__ == "1.2.0"
+    assert embedguard.__version__ == "1.3.0"
     assert pyproject["project"]["version"] == embedguard.__version__
-    assert "version: 1.2.0" in citation
-    assert "## [1.2.0] - 2026-07-10" in changelog
-    assert "**Version:** 1.2.0" in readme
-    assert "Post-publication manuscript version: 3.1" in manuscript
+    assert 'version: "1.3.0"' in citation
+    assert "## [1.3.0] - 2026-09-29" in changelog
+    assert "**Version:** 1.3.0" in readme
+    assert "Post-publication manuscript version: 3.2" in manuscript
 
 
 def test_public_title_matches_crossref_version_of_record():
@@ -519,14 +532,72 @@ def test_public_latency_and_gated_threshold_claims_match_canonical_evidence():
 
 
 def test_retrieval_rank_correlation_claim_matches_implementation():
-    """The manuscript must describe the tie-aware padded SciPy implementation."""
+    """The manuscript must describe the shared-document rank comparison the
+    code implements, and must disclose the pre-1.3.0 degenerate comparison."""
     manuscript = (REPO_ROOT / "paper" / "manuscript.md").read_text(
         encoding="utf-8"
     )
+    source = (REPO_ROOT / "embedguard" / "retrieval_analyzer" / "__init__.py").read_text(
+        encoding="utf-8"
+    )
 
-    assert "right-padded with zeros" in manuscript
+    assert "shares at least two documents" in manuscript
     assert "tie-aware average ranks" in manuscript
-    assert "rank_avg(pad_0(s_t))" in manuscript
+    assert "rank_avg(pos_t(D))" in manuscript
     assert "maps rho to 0" in manuscript
     assert "max(0, (1 - rho) / 2)" in manuscript
     assert "adds 0.30 and caps the result at 1.0" in manuscript
+    assert "abstains with confidence 0" in manuscript
+    assert "right-padded with zeros" in manuscript  # disclosed as the old behaviour
+    assert "no_comparable_history" in source
+    assert "min_rank_overlap" in source
+    assert "curr_padded" not in source
+
+
+def test_tier2b_manuscript_table_matches_committed_results():
+    """Every Table 11 row must be derivable from the committed Tier-2b JSON."""
+    manuscript = (REPO_ROOT / "paper" / "manuscript.md").read_text(encoding="utf-8")
+    docs = (REPO_ROOT / "docs" / "TIER2B_POISONEDRAG.md").read_text(encoding="utf-8")
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert "Regularized Mahalanobis distance between" not in readme
+    files = sorted((REPO_ROOT / "results").glob("tier2b_poisonedrag_*_k*_20260928.json"))
+    assert len(files) == 6
+
+    def cell(w):
+        lo, hi = (100 * x for x in w["ci95"])
+        hi_text = "100" if round(hi, 1) == 100.0 else f"{hi:.1f}"
+        return f"{w['k']}/{w['n']} ({lo:.1f}–{hi_text}%)"
+
+    for path in files:
+        summary = json.loads(path.read_text(encoding="utf-8"))["summary"]
+        scope, test = summary["scope"], summary["test_split"]
+        e2e = test["l3"]["end_to_end"]
+        form = {"blackbox": "Black-box", "stealth": "Stealth"}[scope["poison_form"]]
+        row = (
+            f"| {form} | {scope['poison_per_target']} | "
+            f"{test['attack_retrieval_success']['k']}/50 | "
+            f"{cell(e2e['target_fpr_0.05']['flagged_attacks'])} | "
+            f"{cell(e2e['target_fpr_0.01']['flagged_attacks'])} | "
+            f"{e2e['target_fpr_0.05']['AUROC']:.3f} |"
+        )
+        assert row in manuscript, row
+        docs_row = (
+            f"| {form.lower()} | {scope['poison_per_target']} | "
+            f"{cell(e2e['target_fpr_0.05']['flagged_attacks'])} | "
+            f"{cell(e2e['target_fpr_0.01']['flagged_attacks'])} | "
+            f"{e2e['target_fpr_0.05']['AUROC']:.3f} |"
+        )
+        assert docs_row in docs, docs_row
+        assert e2e["target_fpr_0.05"]["flagged_clean"]["k"] == 6
+        assert e2e["target_fpr_0.01"]["flagged_clean"]["k"] == 1
+        assert "6 times at the 5% target" in manuscript
+        assert scope["source"]["commit"].startswith("80873d7")
+        assert scope["versions"]["embedguard"] == embedguard.__version__
+        assert all(f.endswith(("_20260928.json", "_20260928.md"))
+                   for f in scope["source"]["dirty_files"])
+        assert test["provenance"]["pipeline_valid_hmac"]["detect_successful_attacks"]["k"] == 0
+        assert test["provenance"]["oob_no_certificate"]["detect_successful_attacks"]["k"] == 50
+        assert test["l3"]["default_threshold_0.5"]["TPR_all_attacks"]["k"] == 0
+        assert scope["input_sha256"]["prag_nq.json"] == (
+            "44df711454a9bada08e72e9e4a003a2cc845c43707ac93a3493e5168ec415cf2"
+        )
