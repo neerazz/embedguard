@@ -692,7 +692,7 @@ The reference implementation and Tier-2 evaluation materials are available with 
 
 **Primary Repository:** https://github.com/neerazz/embedguard (MIT License)
 
-**Archived Versions:** Zenodo concept DOI [10.5281/zenodo.18364919](https://doi.org/10.5281/zenodo.18364919) (resolves to latest archive); v1.0.0 = [10.5281/zenodo.18364920](https://doi.org/10.5281/zenodo.18364920) (version of record), v1.1.0 = [10.5281/zenodo.21280092](https://doi.org/10.5281/zenodo.21280092) (post-publication maintenance). Repository v1.3.0 / manuscript v3.2 adds the Tier-2b evaluation and is archived as a new version under the concept DOI.
+**Archived Versions:** Zenodo concept DOI [10.5281/zenodo.18364919](https://doi.org/10.5281/zenodo.18364919) (resolves to latest archive); v1.0.0 = [10.5281/zenodo.18364920](https://doi.org/10.5281/zenodo.18364920) (version of record), v1.1.0 = [10.5281/zenodo.21280092](https://doi.org/10.5281/zenodo.21280092) (post-publication maintenance). Repository v1.3.0 / manuscript v3.2 adds the Tier-2b evaluation and is archived as v1.3.0 = [10.5281/zenodo.23032135](https://doi.org/10.5281/zenodo.23032135).
 
 **Contents:**
 - **Source Code:** Complete EmbedGuard framework implementation (Python 3.10+)
@@ -853,7 +853,7 @@ The configuration below is reported for the published Tier-1 evaluation. It is n
 ### A.4 Reproducibility Checklist
 
 - [x] Code available at: https://github.com/neerazz/embedguard
-- [x] Archived versions with DOIs: Zenodo concept 10.5281/zenodo.18364919 (v1.0.0: 18364920, v1.1.0: 21280092; v1.3.0 under the same concept)
+- [x] Archived versions with DOIs: Zenodo concept 10.5281/zenodo.18364919 (v1.0.0: 18364920, v1.1.0: 21280092, v1.3.0: 23032135)
 - [x] Benchmark datasets included (`data/` directory)
 - [x] Tier-1 hardware/software specifications documented as version-of-record reference
 - [x] Tier-2 dependency ranges declared (`pyproject.toml`, `requirements.txt`)

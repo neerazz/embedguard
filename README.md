@@ -80,7 +80,7 @@ EmbedGuard studies adversarial embedding attacks in Retrieval-Augmented Generati
 **ORCID**: [0009-0002-2125-1805](https://orcid.org/0009-0002-2125-1805)
 **Affiliation**: Independent Researcher, California, USA
 **Contact**: b.neerajkumarsingh@gmail.com
-**Zenodo DOI**: [10.5281/zenodo.18364919](https://doi.org/10.5281/zenodo.18364919) (concept, resolves to latest; v1.1.0: [10.5281/zenodo.21280092](https://doi.org/10.5281/zenodo.21280092))
+**Zenodo DOI**: [10.5281/zenodo.18364919](https://doi.org/10.5281/zenodo.18364919) (concept, resolves to latest; v1.3.0: [10.5281/zenodo.23032135](https://doi.org/10.5281/zenodo.23032135))
 
 > **Note**: This work was conducted independently and is not affiliated with the author's employer.
 
