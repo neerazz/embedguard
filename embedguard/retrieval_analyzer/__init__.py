@@ -170,6 +170,9 @@ class RetrievalDistributionalAnalyzer:
         rank_correlation_min: float = 0.30,
         history_size: int = 1000,
         update_frequency: int = 1000,
+        component_weights: Optional[Dict[str, float]] = None,
+        anomaly_threshold: float = 0.5,
+        min_rank_overlap: int = 2,
     ):
         """Initialize the retrieval analyzer.
 
@@ -179,12 +182,34 @@ class RetrievalDistributionalAnalyzer:
             rank_correlation_min: Minimum expected rank correlation
             history_size: Number of queries to track
             update_frequency: Update PCA every N queries
+            component_weights: Fusion weights for the ``pca``, ``kl`` and
+                ``rank`` components (default 0.5/0.3/0.2). Each weight is
+                multiplied by the component's confidence; components with
+                confidence 0 are excluded and the rest renormalised.
+            anomaly_threshold: Fused score above which ``is_anomalous`` is
+                set. The 0.5 default is uncalibrated; use
+                :meth:`calibrate_threshold` on held-out clean traffic.
+            min_rank_overlap: Minimum number of shared retrieved document IDs
+                for a prior query to be comparable in the rank component
         """
         self.n_components = n_components
         self.kl_threshold = kl_threshold
         self.rank_correlation_min = rank_correlation_min
         self.history_size = history_size
         self.update_frequency = update_frequency
+        weights = {"pca": 0.5, "kl": 0.3, "rank": 0.2}
+        if component_weights:
+            unknown = set(component_weights) - set(weights)
+            if unknown:
+                raise ValueError(f"Unknown component weights: {sorted(unknown)}")
+            weights.update(component_weights)
+        if any(w < 0 for w in weights.values()):
+            raise ValueError("Component weights must be non-negative")
+        if not any(w > 0 for w in weights.values()):
+            raise ValueError("At least one component weight must be positive")
+        self.component_weights = weights
+        self.anomaly_threshold = float(anomaly_threshold)
+        self.min_rank_overlap = max(2, int(min_rank_overlap))
 
         # Initialize PCA
         self.pca = IncrementalPCA(n_components=n_components)
@@ -193,6 +218,11 @@ class RetrievalDistributionalAnalyzer:
         self.query_history: deque = deque(maxlen=history_size)
         self.embedding_history: deque = deque(maxlen=history_size)
         self.score_history: deque = deque(maxlen=history_size)
+        # Per-query retrieved document_id ranking (best first)
+        self.rank_history: deque = deque(maxlen=history_size)
+        # When False, scoring no longer updates the PCA model, the covariance
+        # buffer or the baseline mean. See freeze_baseline().
+        self.adapt_baseline = True
 
         # Baseline distribution (updated during training)
         self.baseline_mean: Optional[np.ndarray] = None
@@ -233,14 +263,16 @@ class RetrievalDistributionalAnalyzer:
             "embedding_dim": embeddings.shape[1] if len(embeddings.shape) > 1 else 0,
         }
 
-        scores = []
-        confidences = []
+        scores: List[float] = []
+        confidences: List[float] = []
+        names: List[str] = []
 
         # 1. PCA-based anomaly detection
         pca_score, pca_conf, pca_details = self._pca_anomaly_score(embeddings)
         details["pca"] = pca_details
         scores.append(pca_score)
         confidences.append(pca_conf)
+        names.append("pca")
 
         # 2. Distribution-distance analysis. The private method name is retained
         # for compatibility, but the implementation computes Mahalanobis distance.
@@ -249,6 +281,7 @@ class RetrievalDistributionalAnalyzer:
         details["kl_divergence"] = kl_details
         scores.append(kl_score)
         confidences.append(kl_conf)
+        names.append("kl")
 
         # 3. Rank correlation analysis. Every query contributes history;
         # evaluation starts only after the warm-up window is populated.
@@ -259,6 +292,7 @@ class RetrievalDistributionalAnalyzer:
             details["rank_correlation"] = rank_details
             scores.append(rank_score)
             confidences.append(rank_conf)
+            names.append("rank")
         else:
             details["rank_correlation"] = {
                 "status": "warming_up",
@@ -269,6 +303,9 @@ class RetrievalDistributionalAnalyzer:
         current_scores = self._document_scores(documents)
         if current_scores:
             self.score_history.append(current_scores)
+        current_ranking = self._document_ranking(documents)
+        if current_ranking:
+            self.rank_history.append(current_ranking)
 
         # Update history
         query_hash = hashlib.sha256(query.encode()).hexdigest()[:16]
@@ -276,13 +313,27 @@ class RetrievalDistributionalAnalyzer:
         self.embedding_history.append(np.mean(embeddings, axis=0))
 
         # Update PCA periodically
-        if self._query_count % self.update_frequency == 0:
+        if self.adapt_baseline and self._query_count % self.update_frequency == 0:
             self._update_pca(embeddings)
 
-        # Combine scores (weighted average)
-        if scores:
-            final_score = np.average(scores, weights=[0.5, 0.3, 0.2][:len(scores)])
-            final_confidence = np.mean(confidences)
+        # Combine scores: configured weight x confidence, dropping components
+        # that reported zero confidence (e.g. no comparable rank history).
+        fusion_weights = {
+            name: self.component_weights[name] * conf
+            for name, conf in zip(names, confidences)
+            if conf > 0 and self.component_weights[name] > 0
+        }
+        total_weight = sum(fusion_weights.values())
+        if total_weight > 0:
+            final_score = sum(
+                score * fusion_weights[name]
+                for name, score in zip(names, scores)
+                if name in fusion_weights
+            ) / total_weight
+            final_confidence = float(np.mean([
+                conf for name, conf in zip(names, confidences)
+                if fusion_weights.get(name, 0.0) > 0
+            ]))
         else:
             final_score = 0.0
             final_confidence = 0.0
@@ -290,9 +341,13 @@ class RetrievalDistributionalAnalyzer:
         details["component_scores"] = {
             "pca": pca_score,
             "kl": kl_score,
-            "rank": scores[2] if len(scores) > 2 else None,
+            "rank": scores[names.index("rank")] if "rank" in names else None,
         }
-        details["is_anomalous"] = final_score > 0.5
+        details["fusion_weights"] = {
+            name: w / total_weight for name, w in fusion_weights.items()
+        } if total_weight > 0 else {}
+        details["anomaly_threshold"] = self.anomaly_threshold
+        details["is_anomalous"] = bool(final_score > self.anomaly_threshold)
 
         return float(final_score), float(final_confidence), details
 
@@ -319,8 +374,11 @@ class RetrievalDistributionalAnalyzer:
         """
         details = {}
 
-        # Fit PCA if needed
+        # Fit PCA if needed. A frozen analyzer never fits on scored traffic.
         if self.pca.n_samples_seen < self.pca.batch_size:
+            if not self.adapt_baseline:
+                details["status"] = "frozen_before_warmup"
+                return 0.0, 0.0, details
             self.pca.partial_fit(embeddings)
             if self.pca.n_samples_seen < self.pca.batch_size:
                 details["status"] = "warming_up"
@@ -353,9 +411,13 @@ class RetrievalDistributionalAnalyzer:
         self, embeddings: np.ndarray
     ) -> Tuple[float, float, Dict[str, Any]]:
         """Compute Mahalanobis distance from baseline distribution.
-        
-        Uses full covariance matrix instead of diagonal assumption for
-        proper multivariate anomaly detection.
+
+        Uses a regularized full covariance once the buffered rows (last 100
+        batches) number at least ``d + 10``. Below that it uses a diagonal
+        approximation whose per-dimension scale is fixed from the first
+        post-initialisation batch. With top-5 retrieval and 768-dimensional
+        embeddings the buffer holds at most 500 rows, so only the diagonal
+        path runs.
         
         Mahalanobis distance: D² = (x - μ)ᵀ Σ⁻¹ (x - μ)
         where Σ is the covariance matrix of the baseline distribution.
@@ -365,7 +427,11 @@ class RetrievalDistributionalAnalyzer:
         # Compute current distribution statistics
         current_mean = np.mean(embeddings, axis=0)
 
-        # Update baseline if not set
+        # Update baseline if not set. A frozen analyzer never initialises
+        # its baseline from scored traffic, which may be an attack.
+        if self.baseline_mean is None and not self.adapt_baseline:
+            details["status"] = "frozen_before_warmup"
+            return 0.0, 0.0, details
         if self.baseline_mean is None:
             self.baseline_mean = current_mean
             # Initialize covariance as identity (will be updated)
@@ -379,7 +445,8 @@ class RetrievalDistributionalAnalyzer:
             # Accumulate embeddings for covariance estimation
             if not hasattr(self, '_embedding_buffer'):
                 self._embedding_buffer = []
-            self._embedding_buffer.append(embeddings)
+            if self.adapt_baseline:
+                self._embedding_buffer.append(embeddings)
             
             # Only compute full covariance after sufficient samples
             # Need more samples than dimensions for stable covariance
@@ -391,6 +458,8 @@ class RetrievalDistributionalAnalyzer:
                 # Fall back to diagonal covariance until we have enough samples
                 current_std = np.std(embeddings, axis=0) + 1e-8
                 if not hasattr(self, 'baseline_std') or self.baseline_std is None:
+                    if not self.adapt_baseline:
+                        return 0.0, 0.0, {"status": "frozen_before_warmup"}
                     self.baseline_std = current_std
                     return 0.0, 0.3, {"status": "accumulating_samples", "n_samples": n_samples}
                 
@@ -435,9 +504,12 @@ class RetrievalDistributionalAnalyzer:
             details["exceeds_threshold"] = mahal_dist > chi2_threshold
             details["n_samples_for_cov"] = n_samples
 
-            # Update baseline with exponential moving average
-            alpha = 0.01
-            self.baseline_mean = alpha * current_mean + (1 - alpha) * self.baseline_mean
+            # Update baseline with exponential moving average. An adaptive
+            # baseline also learns from attack traffic, so a sustained
+            # campaign pulls it toward itself; freeze_baseline() stops this.
+            if self.adapt_baseline:
+                alpha = 0.01
+                self.baseline_mean = alpha * current_mean + (1 - alpha) * self.baseline_mean
 
             return score, confidence, details
 
@@ -458,67 +530,124 @@ class RetrievalDistributionalAnalyzer:
                 scores.append(0.0)
         return scores
 
+    @staticmethod
+    def _document_ranking(documents: List[Document]) -> List[str]:
+        """Return retrieved document IDs ordered best-first.
+
+        Uses ``similarity_score`` metadata when every document has one,
+        otherwise the retrieval order supplied by the caller.
+        """
+        pairs = [
+            (doc.document_id, doc.metadata.get("similarity_score"))
+            for doc in documents
+            if doc.document_id is not None
+        ]
+        ids = [doc_id for doc_id, _ in pairs]
+        sims = [sim for _, sim in pairs]
+        if pairs and all(
+            sim is not None and np.isfinite(float(sim)) for sim in sims
+        ):
+            # Stable sort: ties keep the caller's order.
+            order = sorted(range(len(pairs)), key=lambda i: -float(sims[i]))
+            return [ids[i] for i in order]
+        return ids
+
     def _rank_correlation_score(
         self, documents: List[Document]
     ) -> Tuple[float, float, Dict[str, Any]]:
-        """Analyze temporal rank correlation of retrieval results.
+        """Analyze temporal rank consistency of retrieval results.
 
-        Detects manipulation where retrieved documents suddenly change
-        rank ordering compared to historical patterns.
+        Compares the current document ranking with the most recent prior
+        query whose retrieved ID set shares at least ``min_rank_overlap``
+        documents, using Spearman correlation over the shared documents'
+        ranks. Comparing sorted similarity lists of unrelated queries is
+        meaningless (both are monotone), so when no comparable history
+        exists the component abstains with confidence 0.
         """
-        details = {}
+        details: Dict[str, Any] = {}
 
         if len(self.score_history) < 10:
             details["status"] = "insufficient_history"
             return 0.0, 0.3, details
 
-        current_scores = self._document_scores(documents)
+        current = self._document_ranking(documents)
+        if not current:
+            return 0.0, 0.0, {"error": "No document IDs available"}
+        current_pos = {doc_id: i for i, doc_id in enumerate(current)}
 
-        if not current_scores:
-            return 0.0, 0.0, {"error": "No scores available"}
-
-        # Compute rank correlation with recent history
-        if self.score_history:
-            try:
-                prev_scores = self.score_history[-1]
-
-                # Pad to same length
-                max_len = max(len(current_scores), len(prev_scores))
-                curr_padded = current_scores + [0.0] * (max_len - len(current_scores))
-                prev_padded = prev_scores + [0.0] * (max_len - len(prev_scores))
-
-                # Spearman rank correlation
+        try:
+            for lag, previous in enumerate(reversed(self.rank_history), start=1):
+                shared = [d for d in previous if d in current_pos]
+                if len(shared) < self.min_rank_overlap:
+                    continue
+                prev_pos = {doc_id: i for i, doc_id in enumerate(previous)}
+                curr_ranks = [current_pos[d] for d in shared]
+                prev_ranks = [prev_pos[d] for d in shared]
                 correlation_raw, p_value_raw = stats.spearmanr(
-                    curr_padded, prev_padded
+                    curr_ranks, prev_ranks
                 )
                 correlation = float(np.asarray(correlation_raw).item())
                 p_value = float(np.asarray(p_value_raw).item())
-
                 if np.isnan(correlation):
                     correlation = 0.0
 
-                # Low correlation = potential manipulation
-                # Score: 1 - correlation (higher = more suspicious)
                 # Map correlation from [-1, 1] to anomaly score [1, 0].
-                score = max(0, (1 - correlation) / 2)
+                score = max(0.0, (1 - correlation) / 2)
                 if correlation < self.rank_correlation_min:
                     score = min(score + 0.3, 1.0)  # Boost if below threshold
 
-                confidence = 0.6
-
-                details["rank_correlation"] = float(correlation)
-                details["p_value"] = float(p_value) if not np.isnan(p_value) else None
+                details["rank_correlation"] = correlation
+                details["p_value"] = None if np.isnan(p_value) else p_value
                 details["threshold"] = self.rank_correlation_min
                 details["below_threshold"] = correlation < self.rank_correlation_min
+                details["shared_documents"] = len(shared)
+                details["history_lag"] = lag
                 details["status"] = "evaluated"
+                return float(score), 0.6, details
+        except Exception as e:
+            logger.error(f"Rank correlation error: {e}")
+            return 0.0, 0.0, {"error": str(e)}
 
-                return score, confidence, details
+        details["status"] = "no_comparable_history"
+        details["min_overlap"] = self.min_rank_overlap
+        return 0.0, 0.0, details
 
-            except Exception as e:
-                logger.error(f"Rank correlation error: {e}")
-                return 0.0, 0.0, {"error": str(e)}
+    def freeze_baseline(self) -> None:
+        """Stop updating the clean-traffic model from scored requests.
 
-        return 0.0, 0.3, {"status": "computing"}
+        By default the PCA model, the covariance buffer and the baseline mean
+        keep learning from every request, including ones that score as
+        anomalous. Under a sustained poisoning campaign that pulls the
+        baseline toward the attack and the scores decay. Freeze after
+        building the baseline on traffic you trust to be clean, and rebuild
+        it periodically (``reset`` + warm-up + ``freeze_baseline``) to track
+        legitimate drift. Freezing before warm-up leaves the affected
+        components abstaining (confidence 0) rather than letting the next,
+        possibly adversarial, request initialise them.
+        """
+        self.adapt_baseline = False
+
+    def unfreeze_baseline(self) -> None:
+        """Resume adaptive updates of the clean-traffic model."""
+        self.adapt_baseline = True
+
+    @staticmethod
+    def calibrate_threshold(
+        clean_scores: List[float], target_fpr: float = 0.05
+    ) -> float:
+        """Return the fused-score threshold giving ``target_fpr`` on clean data.
+
+        The threshold is the ``1 - target_fpr`` quantile of ``clean_scores``;
+        ``is_anomalous`` fires strictly above it. Fit it on held-out clean
+        traffic (a calibration split) only - never on the data used to
+        report TPR/FPR, or the reported FPR is optimistically biased.
+        """
+        if not 0.0 < target_fpr < 1.0:
+            raise ValueError("target_fpr must be in (0, 1)")
+        values = np.asarray(list(clean_scores), dtype=float)
+        if values.size == 0:
+            raise ValueError("clean_scores must be non-empty")
+        return float(np.quantile(values, 1.0 - target_fpr, method="higher"))
 
     def _update_pca(self, embeddings: np.ndarray) -> None:
         """Update PCA model with new embeddings."""
@@ -534,6 +663,8 @@ class RetrievalDistributionalAnalyzer:
         self.query_history.clear()
         self.embedding_history.clear()
         self.score_history.clear()
+        self.rank_history.clear()
+        self.adapt_baseline = True
         self.baseline_mean = None
         self.baseline_std = None
         self._query_count = 0

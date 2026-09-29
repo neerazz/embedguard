@@ -22,7 +22,7 @@ from embedguard.types import (
     ThreatLevel,
 )
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 __author__ = "Neeraj Kumar Singh Beshane"
 __email__ = "b.neerajkumarsingh@gmail.com"
 

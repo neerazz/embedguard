@@ -29,6 +29,8 @@ class EmbedGuardConfig(BaseModel):
         use_semantic_output_similarity: Opt into sentence-transformer output
             similarity; disabled by default to avoid implicit model downloads
         thresholds: Detection thresholds for each component
+        retrieval_component_weights: Optional pca/kl/rank fusion weights for
+            the retrieval analyzer (None keeps its 0.5/0.3/0.2 defaults)
         layer_weights: Weights for combining layer signals
         model_name: Embedding model name for semantic similarity
         device: Device for model inference (cuda, cpu, mps)
@@ -93,6 +95,17 @@ class EmbedGuardConfig(BaseModel):
             "threat_score_block": 0.85,
         },
         description="Detection thresholds"
+    )
+
+    # Retrieval-layer component fusion weights (pca / kl / rank). None keeps
+    # the analyzer defaults (0.5 / 0.3 / 0.2). On the open PoisonedRAG
+    # benchmark (docs/TIER2B_POISONEDRAG.md) only the distribution-distance
+    # component ("kl") separates poisoned retrievals, so a deployment facing
+    # corpus poisoning should set {"pca": 0.0, "kl": 1.0, "rank": 0.0} and
+    # calibrate the flag threshold with EmbedGuard.calibrate().
+    retrieval_component_weights: Optional[Dict[str, float]] = Field(
+        default=None,
+        description="Fusion weights for the retrieval analyzer components (pca, kl, rank)",
     )
 
     # Layer weights (from paper: prompt=0.35, embedding=0.75, retrieval=0.50, output=0.20)

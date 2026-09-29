@@ -250,3 +250,51 @@ class TestThreatLevel:
         ]
         for level in levels:
             assert level.value is not None
+
+
+class TestCalibration:
+    """EmbedGuard.calibrate() sets the flag threshold from clean traffic."""
+
+    @staticmethod
+    def _requests(n, offset=0):
+        import numpy as np
+        rng = np.random.default_rng(offset)
+        out = []
+        for q in range(n):
+            docs = []
+            for i in range(3):
+                v = np.ones(8) + 0.1 * rng.standard_normal(8)
+                docs.append(Document(content=f"passage {q}-{i}", embedding=(v / np.linalg.norm(v)).tolist(),
+                                     document_id=f"d{offset}-{q}-{i}"))
+            out.append((f"what is the refund policy for order {q}?", docs))
+        return out
+
+    def test_calibrate_sets_threshold_from_clean_quantile(self):
+        guard = EmbedGuard(EmbedGuardConfig(
+            enable_output_verification=False,
+            retrieval_component_weights={"pca": 0.0, "kl": 1.0, "rank": 0.0}))
+        info = guard.calibrate(self._requests(60), target_fpr=0.1)
+
+        assert info["n_clean"] == 60
+        assert guard.correlation_engine.flag_threshold == info["flag_threshold"]
+        assert guard.correlation_engine.block_threshold >= info["flag_threshold"]
+        assert info["observed_clean_flag_rate"] <= 0.1
+
+    def test_calibrate_rejects_empty_input(self):
+        guard = EmbedGuard(EmbedGuardConfig(enable_output_verification=False))
+        with pytest.raises(ValueError):
+            guard.calibrate([], target_fpr=0.05)
+
+    def test_retrieval_component_weights_reach_the_analyzer(self):
+        guard = EmbedGuard(EmbedGuardConfig(
+            retrieval_component_weights={"pca": 0.0, "kl": 1.0, "rank": 0.0}))
+        assert guard.retrieval_analyzer.component_weights == {"pca": 0.0, "kl": 1.0, "rank": 0.0}
+        assert EmbedGuard().retrieval_analyzer.component_weights == {"pca": 0.5, "kl": 0.3, "rank": 0.2}
+
+
+    def test_calibrate_refuses_when_no_layer_produces_a_score(self):
+        guard = EmbedGuard(EmbedGuardConfig(
+            enable_prompt_detection=False, enable_retrieval_analysis=False,
+            enable_output_verification=False))
+        with pytest.raises(ValueError, match="every calibration score is 0"):
+            guard.calibrate(self._requests(10), target_fpr=0.05)

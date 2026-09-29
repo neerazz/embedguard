@@ -3,8 +3,9 @@
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
+import numpy as np
 from loguru import logger
 
 from embedguard.config import EmbedGuardConfig, OperationalMode
@@ -85,6 +86,7 @@ class EmbedGuard:
                 n_components=self.config.pca_components,
                 kl_threshold=self.config.get_threshold("kl_divergence"),
                 update_frequency=self.config.pca_update_frequency,
+                component_weights=self.config.retrieval_component_weights,
             )
             logger.debug("Retrieval analyzer initialized")
         else:
@@ -391,6 +393,65 @@ class EmbedGuard:
                 "thresholds": self.config.thresholds,
                 "layer_weights": self.config.layer_weights,
             },
+        }
+
+    def calibrate(
+        self,
+        clean_samples: Iterable[Tuple[str, Union[List[str], List[Document]]]],
+        target_fpr: float = 0.05,
+        freeze_baseline: bool = True,
+    ) -> Dict[str, Any]:
+        """Set the FLAG threshold from known-clean traffic.
+
+        Runs ``analyze`` over ``clean_samples`` (query, retrieved documents)
+        and sets the correlation engine's flag threshold so that about
+        ``target_fpr`` of those clean requests would have been flagged. The
+        block threshold is raised to the flag threshold if it was lower.
+
+        The shipped 0.70 / 0.85 thresholds are not calibrated for any corpus.
+        Use traffic that is representative of production and that you trust
+        to be clean, and keep it separate from any data you use to measure
+        detection, otherwise the measured false-positive rate is optimistic.
+        The clean samples also extend the retrieval baseline. With
+        ``freeze_baseline`` (the default) the baseline is then frozen, so
+        later traffic, including attacks, cannot pull it toward itself.
+        Recalibrate on fresh trusted traffic to follow legitimate drift.
+        """
+        scores = [
+            self.analyze(query, documents).threat_score
+            for query, documents in clean_samples
+        ]
+        if not scores:
+            raise ValueError("clean_samples must be non-empty")
+        if max(scores) <= 0.0:
+            raise ValueError(
+                "every calibration score is 0, so no threshold can be learned; "
+                "enable a scoring layer (for example retrieval analysis) and "
+                "warm it up on trusted traffic before calibrate()"
+            )
+        if freeze_baseline and self.retrieval_analyzer is not None:
+            self.retrieval_analyzer.freeze_baseline()
+        cut = RetrievalDistributionalAnalyzer.calibrate_threshold(scores, target_fpr)
+        # Decisions fire at score >= threshold; step just above the clean quantile.
+        flag = float(np.nextafter(cut, np.inf))
+        engine = self.correlation_engine
+        engine.flag_threshold = flag
+        engine.block_threshold = max(engine.block_threshold, flag)
+        observed = sum(score >= flag for score in scores) / len(scores)
+        logger.info(
+            f"Calibrated flag threshold {flag:.4f} on {len(scores)} clean samples "
+            f"(observed clean flag rate {observed:.3f})"
+        )
+        return {
+            "n_clean": len(scores),
+            "target_fpr": target_fpr,
+            "flag_threshold": flag,
+            "block_threshold": engine.block_threshold,
+            "observed_clean_flag_rate": observed,
+            "baseline_frozen": bool(
+                self.retrieval_analyzer is not None
+                and not self.retrieval_analyzer.adapt_baseline
+            ),
         }
 
     def reset(self) -> None:
